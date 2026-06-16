@@ -1,228 +1,153 @@
-# 🌍 Informe de Proyecto: RespiraCiudad
+# 📋 Product Backlog — EcoBytes
 
-**Evento:** Tangara Hackaton
-
-**Equipo:** Bit&Volt Labs (5 integrantes: 1 Ingeniería Electrónica, 4 Ingeniería de Sistemas)
-
-**Marco de Trabajo:** Scrum (Sprints semanales de 1 semana - Duración total: 6 semanas)
+**Equipo:** Bit&Volt Labs | **Marco:** Scrum | **Versión:** 1.0 | **Fecha:** Junio 2026
 
 ---
 
-## 🚀 1. Descripción General del Proyecto
+## Leyenda
 
-**EcoBytes** es una solución tecnológica multiplataforma (Web y Móvil) diseñada para el monitoreo interactivo de la calidad del aire (PM2.5, CO2 y Humedad) en tiempo real. Combina la captura de datos desde sensores urbanos, algoritmos de calibración avanzada en Python para corregir desviaciones por factores ambientales, visualización geográfica sectorizada, inteligencia artificial para consultas en lenguaje natural mediante un chatbot y un módulo de gamificación orientado a la educación ambiental.
-
-### 🛠️ Stack Tecnológico Seleccionado
-
-* **Frontend / Mobile:** Next.js (Configurado como PWA) / React Native (Expo) + Tailwind CSS.
-* **Mapas y GIS:** Mapbox GL JS o Leaflet.js.
-* **Backend & APIs:** FastAPI (Python).
-* **Base de Datos:** PostgreSQL + PostGIS (Soporte Geográfico).
-* **Inteligencia Artificial:** OpenAI API / Anthropic API + LangChain (SQL Agent / RAG).
-* **Módulo de Juego:** Phaser.js.
-
----
-
-## 🗺️ 2. Estructura de Épicas (Product Backlog)
-
-| Código | Épica | Descripción |
-| --- | --- | --- |
-| **EPI-01** | Infraestructura y Arquitectura Base | Configuración de servidores, repositorios, despliegue de bases de datos y tuberías de datos iniciales. |
-| **EPI-02** | Procesamiento y Calibración de Datos | Ingesta de métricas de hardware y aplicación del algoritmo matemático de corrección de PM2.5. |
-| **EPI-03** | Dashboard y Mapa Interactivo | Visualización web/mobile, delimitación espacial de zonas, interacción dinámica (hover) y sección educativa. |
-| **EPI-04** | Chatbot de Consultas Ambientales | Orquestación de IA y lenguaje natural conectado a la base de datos de sensores para consultas de usuarios. |
-| **EPI-05** | Módulo de Gamificación | Desarrollo e integración del videojuego interactivo orientado a concientizar sobre la calidad del aire. |
+| Campo | Descripción |
+| --- | --- |
+| **ID** | Identificador único del ítem |
+| **Tipo** | `Historia` / `Tarea Técnica` / `Spike` / `Bug` |
+| **Épica** | Épica a la que pertenece |
+| **Prioridad** | `Crítica` › `Alta` › `Media` › `Baja` |
+| **Estimación** | Story Points (escala Fibonacci: 1, 2, 3, 5, 8, 13) |
+| **Sprint** | Sprint asignado (0–5) |
+| **Estado** | `Por hacer` / `En progreso` / `Hecho` / `Bloqueado` |
+| **Dependencias** | IDs de ítems que deben completarse antes |
 
 ---
 
-## 📋 3. Especificación de Historias de Usuario e Historial de Tareas
+## Épicas
 
-### 📦 HISTORIA DE USUARIO 1: Algoritmo de Corrección de PM2.5 (Épica: EPI-02)
-
-> **Como** Analista de Datos del proyecto,
-> **Quiero** aplicar un factor de ajuste automatizado a los sensores de menor calidad,
-> **Para** que las mediciones de PM2.5 mostradas en la web sean confiables a pesar de las condiciones del entorno (ej. alta humedad).
-
-* **Criterios de Aceptación:**
-* *Dado* que el sistema recibe datos en tiempo real de un sensor sensible, *cuando* el dato de PM2.5 ingresa, *entonces* se le aplica la fórmula de calibración definida antes de almacenarlo.
-* El sistema debe almacenar tanto el dato crudo (`pm25_raw`) como el corregido (`pm25_calibrated`).
-
-
-* **Tareas Técnicas:**
-* [ ] T1.1: Analizar el patrón de error de los sensores y definir la fórmula matemática de calibración. *(Responsable: Electrónica)*
-* [ ] T1.2: Crear el endpoint en FastAPI para recibir los datos de los sensores en tiempo real. *(Responsable: Backend)*
-* [ ] T1.3: Codificar la función de calibración en Python. *(Responsable: Backend/Datos)*
-* [ ] T1.4: Modificar el esquema de la base de datos PostgreSQL para almacenar ambos valores de PM2.5. *(Responsable: Backend)*
-* [ ] T1.5: Crear pruebas unitarias con datos simulados para validar la calibración. *(Responsable: Sistemas/QA)*
-
-
-
-### 📦 HISTORIA DE USUARIO 2: Mapa Sectorizado por Zonas (Épica: EPI-03)
-
-> **Como** Ciudadano o Investigador,
-> **Quiero** ver un mapa de la ciudad dividido por sectores con la ubicación de los sensores,
-> **Para** identificar rápidamente la distribución geográfica de los puntos de monitoreo.
-
-* **Criterios de Aceptación:**
-* El mapa debe ser multiplataforma (adaptable a web de escritorio y pantallas móviles).
-* Los sectores de la ciudad deben estar claramente delimitados mediante polígonos visuales.
-
-
-* **Tareas Técnicas:**
-* [ ] T2.1: Diseñar la interfaz del mapa base y definir la paleta de colores de las zonas. *(Responsable: Frontend/UX)*
-* [ ] T2.2: Configurar la extensión PostGIS y cargar el archivo geográfico (GeoJSON) con los sectores. *(Responsable: Backend/GIS)*
-* [ ] T2.3: Integrar Mapbox/Leaflet en el frontend y renderizar los polígonos geográficos. *(Responsable: Frontend)*
-* [ ] T2.4: Mapear e ingresar las coordenadas reales de los sensores como marcadores físicos en el mapa. *(Responsable: Electrónica/Frontend)*
-* [ ] T2.5: Optimizar el renderizado adaptivo (responsive) del mapa para dispositivos móviles. *(Responsable: Sistemas)*
-
-
-
-### 📦 HISTORIA DE USUARIO 3: Información en Tiempo Real al Pasar el Mouse (Épica: EPI-03)
-
-> **Como** Usuario del Dashboard,
-> **Quiero** pasar el mouse por encima de un sector en el mapa (o presionar en móvil),
-> **Para** ver un resumen emergente (Tooltip) con los datos de PM2.5, CO2 y humedad en tiempo real.
-
-* **Criterios de Aceptación:**
-* *Dado* que navego en el mapa, *cuando* coloco el cursor sobre una zona, *entonces* aparece un modal flotante sin retraso perceptible con los promedios actuales de las métricas.
-* Si los sensores de la zona están desconectados, el tooltip debe indicar explícitamente "Sensor fuera de línea".
-
-
-* **Tareas Técnicas:**
-* [ ] T3.1: Diseñar el componente UI del Tooltip / Tarjeta emergente. *(Responsable: Frontend/UX)*
-* [ ] T3.2: Programar los eventos de interacción del mapa (`onMouseEnter` / `onMouseLeave` o tap). *(Responsable: Frontend)*
-* [ ] T3.3: Crear una consulta optimizada en FastAPI que devuelva los promedios en tiempo real por sector. *(Responsable: Backend)*
-* [ ] T3.4: Conectar el frontend con las respuestas dinámicas del backend para inyectar datos al Tooltip. *(Responsable: Frontend/Backend)*
-* [ ] T3.5: Validar el manejo de excepciones visuales para sensores fuera de línea. *(Responsable: Sistemas/QA)*
-
-
-
-### 📦 HISTORIA DE USUARIO 4: Sección Educativa e Informativa (Épica: EPI-03)
-
-> **Como** Estudiante o Usuario Curioso,
-> **Quiero** acceder a una sección informativa dentro de la plataforma,
-> **Para** entender el impacto del PM2.5 y CO2 en mi salud y conocer formas de ayudar a la comunidad.
-
-* **Criterios de Aceptación:**
-* La sección debe ser de fácil acceso y presentar el contenido académico de forma ligera, interactiva y didáctica.
-
-
-* **Tareas Técnicas:**
-* [ ] T4.1: Investigar y redactar el contenido académico (definiciones, causas, alertas de salud). *(Responsable: Todo el equipo)*
-* [ ] T4.2: Diseñar la estructura visual interactiva de la sección dentro del layout del dashboard. *(Responsable: Frontend/UX)*
-* [ ] T4.3: Maquetar los textos, gráficos explicativos e infografías utilizando Tailwind CSS. *(Responsable: Frontend)*
-* [ ] T4.4: Realizar pruebas de lectura y adaptabilidad responsiva en celulares. *(Responsable: Sistemas)*
-
-
-
-### 📦 HISTORIA DE USUARIO 5: Consulta de Datos mediante Chatbot (Épica: EPI-04)
-
-> **Como** Usuario de la plataforma,
-> **Quiero** interactuar con un chatbot integrado,
-> **Para** preguntarle directamente el estado del aire en zonas específicas sin necesidad de buscar gráficos.
-
-* **Criterios de Aceptación:**
-* *Dado* que interactúo con el chatbot, *cuando* pregunto *"¿Cómo está la calidad del aire en el Sector Centro?"*, *entonces* el chatbot consulta la base de datos y responde de manera amigable con los niveles reales detectados.
-
-
-* **Tareas Técnicas:**
-* [ ] T5.1: Configurar el entorno de LangChain y conectarlo con la API del modelo de lenguaje (LLM). *(Responsable: Backend/IA)*
-* [ ] T5.2: Desarrollar la lógica del *SQL Agent* para que la IA entienda e interactúe con el esquema de PostGIS. *(Responsable: Backend/IA)*
-* [ ] T5.3: Crear el endpoint `/api/chatbot` en FastAPI para la comunicación con la interfaz de usuario. *(Responsable: Backend)*
-* [ ] T5.4: Diseñar e implementar la ventana flotante (burbuja de chat) en el frontend web y móvil. *(Responsable: Frontend)*
-* [ ] T5.5: Configurar e iterar el Prompt de Sistema para bloquear preguntas fuera de contexto. *(Responsable: Sistemas/QA)*
-
-
-
-### 📦 HISTORIA DE USUARIO 6: Módulo de Juego Interactivo Ambiental (Épica: EPI-05)
-
-> **Como** Estudiante o Usuario de la comunidad,
-> **Quiero** participar en un juego interactivo dentro de la plataforma,
-> **Para** aprender a través de desafíos lúdicos cómo mis decisiones diarias reducen la contaminación por CO2 y PM2.5.
-
-* **Criterios de Aceptación:**
-* El juego debe integrarse estéticamente como una pestaña dedicada del dashboard y contar con estados claros (Inicio, Jugando, Fin de juego).
-* Debe entregar una puntuación final (Score) basada en el impacto ecológico de las decisiones del jugador.
-
-
-* **Tareas Técnicas:**
-* [ ] T6.1: Definir las mecánicas y flujo lógico del juego (ej. simulador de decisiones urbanas o quiz contra reloj). *(Responsable: Todo el equipo)*
-* [ ] T6.2: Configurar el entorno del lienzo de juego (Phaser.js) dentro de la arquitectura frontend. *(Responsable: Frontend)*
-* [ ] T6.3: Programar la lógica del sistema de puntuación ecológica y el temporizador. *(Responsable: Sistemas)*
-* [ ] T6.4: Diseñar los elementos gráficos, activos (assets) visuales y las pantallas del juego. *(Responsable: Frontend/UX)*
-* [ ] T6.5: Integrar el módulo final del juego dentro del contenedor multiplataforma principal. *(Responsable: Frontend)*
-
-
+| Código | Nombre |
+| --- | --- |
+| EPI-01 | Infraestructura y Arquitectura Base |
+| EPI-02 | Procesamiento y Calibración de Datos |
+| EPI-03 | Dashboard y Mapa Interactivo |
+| EPI-04 | Chatbot de Consultas Ambientales |
+| EPI-05 | Módulo de Gamificación |
+| EPI-06 | Autenticación y Persistencia de Usuario |
 
 ---
 
-## 📅 4. Plan de Sprints (Roadmap de 6 Semanas)
+## Backlog Ordenado por Prioridad
 
-### 🚀 Sprint 0 (Semana 1): Cimientos y Arquitectura Base
+### 🏗️ EPI-01 — Infraestructura y Arquitectura Base
 
-* **Meta:** Configurar entornos de desarrollo y formalizar el modelo matemático de calibración.
-* **Historias/Entregables:**
-* Repositorios de GitHub inicializados. Esquema base de datos espacial configurado.
-* Documentación técnica de la fórmula de calibración por hardware en la Wiki de Taiga.
-* Diseño de prototipos visuales (Wireframes) del Dashboard y del juego.
-
-
-
-### 🗺️ Sprint 1 (Semana 2): Ingesta, Calibración y Mapa Base
-
-* **Meta:** Lograr el flujo real de datos desde los sensores y renderizar el mapa geográfico.
-* **Historias/Entregables:**
-* **HU 1** (Algoritmo de Corrección de PM2.5) completa al 100%.
-* **HU 2** (Mapa Sectorizado por Zonas) completa al 100%.
-
-
-
-### 📊 Sprint 2 (Semana 3): Dashboard Interactivo y Sección Educativa
-
-* **Meta:** Entregar valor directo en pantalla al usuario mediante la interacción de datos y teoría.
-* **Historias/Entregables:**
-* **HU 3** (Información en Tiempo Real al Pasar el Mouse) completa al 100%.
-* **HU 4** (Sección Educativa e Informativa) completa al 100%.
-
-
-
-### 🤖 Sprint 3 (Semana 4): Integración del Chatbot de IA
-
-* **Meta:** Desplegar el procesamiento de lenguaje natural conectado a las métricas del sistema.
-* **Historias/Entregables:**
-* **HU 5** (Consulta de Datos mediante Chatbot) completa al 100%.
-
-
-
-### 🎮 Sprint 4 (Semana 5): Módulo de Gamificación (El Juego)
-
-* **Meta:** Programar, pulir e integrar el videojuego de concientización dentro de la plataforma.
-* **Historias/Entregables:**
-* **HU 6** (Módulo de Juego Interactivo Ambiental) completa al 100%.
-
-
-
-### 🏁 Sprint 5 (Semana 6): Pruebas Finales, Despliegue y Cierre
-
-* **Meta:** Cero errores críticos de software, optimización móvil y despliegue del MVP para los jurados.
-* **Historias/Entregables:**
-* Limpieza del panel de incidencias (Issues/Bugs) en Taiga.
-* Plataforma desplegada de forma pública (Vercel / Render / Heroku / Servidores universitarios).
-* Preparación del Pitch y la Demo académica en vivo.
-
-
+| ID | Tipo | Descripción | Prioridad | SP | Sprint | Estado | Dependencias |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SP-01 | Spike | Inicializar monorepo `ecobytes` en GitHub con estructura `frontend/` + `backend/`, ramas `main` y `develop`, `.gitignore` y `README.md`. | Crítica | 2 | 0 | Por hacer | — |
+| SP-03 | Spike | Configurar PostgreSQL 15 + extensión PostGIS en entorno de desarrollo local. | Crítica | 2 | 0 | Por hacer | SP-01 |
+| SP-04 | Spike | Configurar `backend/.env.example` con plantilla de variables de entorno (BD, JWT, LLM). Verificar que `.env` esté en `.gitignore`. | Crítica | 1 | 0 | Por hacer | SP-01 |
+| SP-05 | Spike | Definir `pubspec.yaml` base con dependencias fijadas (`riverpod`, `flutter_map`, `flame`, `dio`, `web_socket_channel`, `flutter_secure_storage`). | Crítica | 1 | 0 | Por hacer | SP-01 |
+| SP-06 | Spike | Crear `main.py` en FastAPI con CORS habilitado y endpoints de prueba para simulación de sensores. | Crítica | 2 | 0 | Por hacer | SP-01, SP-03 |
+| SP-07 | Spike | Diseñar wireframes del Dashboard, pantalla de autenticación y pantalla del juego (Figma o similar). | Alta | 3 | 0 | Por hacer | — |
 
 ---
 
-## 🛠️ 5. Gobierno de Código: Estrategia de Ramas en Git
+### 📡 EPI-02 — Procesamiento y Calibración de Datos
 
-Se implementará un enfoque **Gitflow Simplificado** enfocado en el aislamiento de componentes:
+| ID | Tipo | Descripción | Prioridad | SP | Sprint | Estado | Dependencias |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| HU-01 | Historia | **Algoritmo de Corrección de PM2.5:** Como analista de datos, quiero que el sistema aplique una fórmula de calibración al dato crudo de PM2.5 antes de almacenarlo, para que las mediciones sean confiables bajo condiciones de alta humedad. | Crítica | 8 | 1 | Por hacer | SP-01, SP-03 |
+| T-01.1 | Tarea | Analizar el patrón de error de los sensores y documentar la fórmula matemática de calibración en la Wiki. *(Electrónica)* | Crítica | 3 | 1 | Por hacer | HU-01 |
+| T-01.2 | Tarea | Crear endpoint `POST /sensors/data` en FastAPI para recibir datos de sensores en tiempo real. *(Backend)* | Crítica | 2 | 1 | Por hacer | SP-06, T-01.1 |
+| T-01.3 | Tarea | Codificar la función de calibración en Python usando NumPy. *(Backend/Datos)* | Crítica | 3 | 1 | Por hacer | T-01.1 |
+| T-01.4 | Tarea | Modificar el esquema de PostgreSQL para almacenar `pm25_raw` y `pm25_calibrated`. *(Backend)* | Crítica | 2 | 1 | Por hacer | SP-03, T-01.1 |
+| T-01.5 | Tarea | Crear pruebas unitarias con datos simulados para validar la función de calibración. *(Sistemas/QA)* | Alta | 2 | 1 | Por hacer | T-01.3 |
 
-* **`main`:** Producción. Solo contiene software estable, probado y listo para la entrega.
-* **`develop`:** Integración. Rama base del Sprint donde confluyen los desarrollos del equipo.
-* **Ramas temporales (`feature/`)**: Creadas a partir de `develop` por cada tarea (ej: `feature/data-calibracion-pm25`, `feature/front-mapa-base`).
+---
 
-### 🛡️ Políticas de Calidad
+### 🗺️ EPI-03 — Dashboard y Mapa Interactivo
 
-1. **Revisión de Código (Code Review):** Todo Pull Request hacia la rama `develop` requiere la aprobación obligatoria de al menos otro ingeniero de sistemas para validar la calidad del código.
-2. **Cierre de Sprint:** Los viernes durante la sesión de Review, si las historias pasan los criterios de aceptación, se realiza un Merge consolidado de `develop` a `main` para actualización del MVP.
+| ID | Tipo | Descripción | Prioridad | SP | Sprint | Estado | Dependencias |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| HU-02 | Historia | **Mapa Sectorizado por Zonas:** Como ciudadano o investigador, quiero ver un mapa de la ciudad dividido por sectores con la ubicación de los sensores, para identificar la distribución geográfica de los puntos de monitoreo. | Crítica | 8 | 1 | Por hacer | SP-01, SP-03 |
+| T-02.1 | Tarea | Diseñar la interfaz del mapa base y definir la paleta de colores de las zonas. *(Frontend/UX)* | Alta | 2 | 1 | Por hacer | SP-07 |
+| T-02.2 | Tarea | Configurar PostGIS y cargar el archivo GeoJSON con los sectores de la ciudad. *(Backend/GIS)* | Crítica | 3 | 1 | Por hacer | SP-03 |
+| T-02.3 | Tarea | Integrar `flutter_map` en Flutter y renderizar los polígonos geográficos desde el GeoJSON. *(Frontend)* | Crítica | 3 | 1 | Por hacer | SP-05, T-02.2 |
+| T-02.4 | Tarea | Mapear las coordenadas reales de los sensores como marcadores en el mapa. *(Electrónica/Frontend)* | Alta | 2 | 1 | Por hacer | T-02.3, T-01.4 |
+| T-02.5 | Tarea | Validar el renderizado responsivo del mapa en pantallas móviles. *(Sistemas)* | Media | 1 | 1 | Por hacer | T-02.3 |
+| HU-03 | Historia | **Datos en Tiempo Real (Hover/Tap):** Como usuario del dashboard, quiero pasar el cursor sobre un sector del mapa (o presionar en móvil) para ver un tooltip con los datos de PM2.5, CO2 y humedad en tiempo real. | Crítica | 8 | 2 | Por hacer | HU-02, HU-01 |
+| T-03.1 | Tarea | Diseñar el componente UI del Tooltip / Tarjeta emergente en Flutter. *(Frontend/UX)* | Alta | 2 | 2 | Por hacer | SP-07 |
+| T-03.2 | Tarea | Programar los eventos de interacción del mapa (`onTap` / `onHover`) usando `flutter_map`. *(Frontend)* | Crítica | 2 | 2 | Por hacer | HU-02 |
+| T-03.3 | Tarea | Implementar el endpoint WebSocket en FastAPI que emite promedios por sector en tiempo real. *(Backend)* | Crítica | 3 | 2 | Por hacer | HU-01 |
+| T-03.4 | Tarea | Conectar Flutter al WebSocket con `web_socket_channel` e inyectar datos al Tooltip via Riverpod. *(Frontend/Backend)* | Crítica | 3 | 2 | Por hacer | T-03.2, T-03.3 |
+| T-03.5 | Tarea | Validar manejo de excepciones visuales para sensores fuera de línea. *(Sistemas/QA)* | Alta | 1 | 2 | Por hacer | T-03.4 |
+| HU-04 | Historia | **Sección Educativa:** Como estudiante o usuario curioso, quiero acceder a una sección informativa sobre el impacto del PM2.5 y CO2 en mi salud, presentada de forma didáctica e interactiva. | Media | 5 | 2 | Por hacer | SP-01 |
+| T-04.1 | Tarea | Investigar y redactar el contenido académico (definiciones, causas, alertas de salud). *(Todo el equipo)* | Media | 2 | 2 | Por hacer | — |
+| T-04.2 | Tarea | Diseñar la estructura visual interactiva de la sección dentro del layout del dashboard Flutter. *(Frontend/UX)* | Media | 2 | 2 | Por hacer | SP-07, T-04.1 |
+| T-04.3 | Tarea | Maquetar textos, gráficos explicativos e infografías usando widgets de Flutter. *(Frontend)* | Media | 2 | 2 | Por hacer | T-04.2 |
+| T-04.4 | Tarea | Realizar pruebas de legibilidad y adaptabilidad en dispositivos móviles. *(Sistemas)* | Baja | 1 | 2 | Por hacer | T-04.3 |
+
+---
+
+### 🔐 EPI-06 — Autenticación y Persistencia de Usuario
+
+| ID | Tipo | Descripción | Prioridad | SP | Sprint | Estado | Dependencias |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| HU-06 | Historia | **Registro y Login:** Como usuario, quiero crear una cuenta con email y contraseña y hacer login, para que mi puntaje en el juego quede guardado entre sesiones. | Alta | 5 | 3 | Por hacer | SP-01, SP-03 |
+| T-06.1 | Tarea | Crear endpoints `POST /auth/register` y `POST /auth/login` en FastAPI con emisión de JWT. *(Backend)* | Alta | 3 | 3 | Por hacer | SP-06, SP-04 |
+| T-06.2 | Tarea | Diseñar las pantallas de registro e inicio de sesión en Flutter. *(Frontend/UX)* | Alta | 2 | 3 | Por hacer | SP-07 |
+| T-06.3 | Tarea | Implementar gestión del token JWT en Flutter con `flutter_secure_storage`. *(Frontend)* | Alta | 2 | 3 | Por hacer | T-06.1, T-06.2 |
+| T-06.4 | Tarea | Proteger los endpoints de score con middleware de autenticación en FastAPI. *(Backend)* | Alta | 1 | 3 | Por hacer | T-06.1 |
+
+---
+
+### 🤖 EPI-04 — Chatbot de Consultas Ambientales
+
+| ID | Tipo | Descripción | Prioridad | SP | Sprint | Estado | Dependencias |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| HU-05 | Historia | **Chatbot Ambiental:** Como usuario, quiero interactuar con un chatbot integrado para preguntarle el estado del aire en zonas específicas en lenguaje natural, sin necesidad de buscar gráficos. | Alta | 13 | 3 | Por hacer | HU-01, HU-02 |
+| T-05.1 | Tarea | Configurar LangChain en el backend y conectarlo con la API del LLM seleccionado (OpenAI o Anthropic). *(Backend/IA)* | Alta | 3 | 3 | Por hacer | SP-04 |
+| T-05.2 | Tarea | Desarrollar la lógica del SQL Agent para que la IA interactúe con el esquema de PostGIS. *(Backend/IA)* | Alta | 5 | 3 | Por hacer | T-05.1, T-01.4 |
+| T-05.3 | Tarea | Crear el endpoint `POST /api/chatbot` en FastAPI con soporte de streaming. *(Backend)* | Alta | 2 | 3 | Por hacer | T-05.1 |
+| T-05.4 | Tarea | Diseñar e implementar la burbuja de chat flotante en Flutter usando `Dio` y EventStreams. *(Frontend)* | Alta | 3 | 3 | Por hacer | SP-05, T-05.3 |
+| T-05.5 | Tarea | Configurar e iterar el System Prompt para bloquear preguntas fuera del contexto ambiental. *(Sistemas/QA)* | Media | 2 | 3 | Por hacer | T-05.2 |
+| T-05.6 | Tarea | Verificar que las API keys del LLM estén aisladas en variables de entorno y documentadas en `.env.example`. *(Backend)* | Alta | 1 | 3 | Por hacer | SP-04 |
+
+---
+
+### 🎮 EPI-05 — Módulo de Gamificación
+
+| ID | Tipo | Descripción | Prioridad | SP | Sprint | Estado | Dependencias |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| HU-07 | Historia | **Juego Interactivo Ambiental:** Como estudiante o usuario de la comunidad, quiero participar en un juego integrado a la plataforma para aprender cómo mis decisiones diarias reducen la contaminación, con un puntaje final guardado en mi cuenta. | Alta | 13 | 4 | Por hacer | HU-06 |
+| T-07.1 | Tarea | Definir mecánicas y flujo lógico del juego (simulador de decisiones urbanas o quiz contra reloj). *(Todo el equipo)* | Alta | 2 | 4 | Por hacer | SP-07 |
+| T-07.2 | Tarea | Configurar Flame Engine dentro del proyecto Flutter como widget nativo en la pestaña del juego. *(Frontend)* | Alta | 2 | 4 | Por hacer | SP-05, T-07.1 |
+| T-07.3 | Tarea | Programar la lógica del sistema de puntuación ecológica y el temporizador en Flame. *(Sistemas)* | Alta | 3 | 4 | Por hacer | T-07.2 |
+| T-07.4 | Tarea | Diseñar assets visuales: sprites, fondos, pantallas de inicio y fin de juego. *(Frontend/UX)* | Media | 3 | 4 | Por hacer | T-07.1 |
+| T-07.5 | Tarea | Crear endpoint `POST /game/score` en FastAPI para persistir el puntaje del usuario autenticado. *(Backend)* | Alta | 2 | 4 | Por hacer | T-06.4 |
+| T-07.6 | Tarea | Integrar la llamada al endpoint de score al finalizar la partida desde Flutter. *(Frontend/Backend)* | Alta | 2 | 4 | Por hacer | T-07.3, T-07.5 |
+
+---
+
+## 📊 Resumen por Sprint
+
+| Sprint | Foco | Historias | SP Totales (aprox.) |
+| --- | --- | --- | --- |
+| Sprint 0 | Infraestructura, entornos y wireframes | SP-01, SP-03 → SP-07 | 10 |
+| Sprint 1 | Ingesta de datos y mapa base | HU-01, HU-02 | 16 |
+| Sprint 2 | Dashboard en tiempo real y sección educativa | HU-03, HU-04 | 13 |
+| Sprint 3 | Autenticación y chatbot de IA | HU-06, HU-05 | 18 |
+| Sprint 4 | Módulo de gamificación | HU-07 | 13 |
+| Sprint 5 | QA final, despliegue y pitch | Bugs / limpieza | — |
+| **Total** | | **7 historias + 7 spikes** | **~71 SP** |
+
+---
+
+## 🔗 Mapa de Dependencias Críticas
+
+```scheme
+SP-01 ──► SP-03 ──► T-01.4 ──► HU-02 ──► HU-03
+       │                              └──► HU-05
+       ├──► SP-04 ──► T-05.6
+       │         └──► T-06.1 ──► T-06.3
+       │                     └──► T-06.4 ──► T-07.5 ──► T-07.6
+       ├──► SP-05 ──► T-02.3 ──► T-02.4
+       └──► SP-06 ──► T-01.2
+T-01.1 ──► T-01.3 ──► T-01.5
+HU-06  ──► HU-07
+```
