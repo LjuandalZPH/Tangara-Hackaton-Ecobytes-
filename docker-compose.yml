@@ -1,0 +1,46 @@
+services:
+
+  # ─────────────────────────────────────────
+  # BASE DE DATOS — PostgreSQL 15 + PostGIS
+  # ─────────────────────────────────────────
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: ecobytes_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ecobytes
+      POSTGRES_USER: ecobytes_user
+      POSTGRES_PASSWORD: ecobytes_pass
+    ports:
+      - "5432:5432"         # accesible desde tu máquina para inspeccionar con DBeaver/pgAdmin
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql  # corre al crear la BD por primera vez
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecobytes_user -d ecobytes"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # BACKEND — FastAPI
+  # ─────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecobytes_api
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"         # http://localhost:8000
+    volumes:
+      - ./backend:/app      # hot-reload: cambios en el código se reflejan sin reconstruir
+    depends_on:
+      db:
+        condition: service_healthy   # espera a que la BD esté lista antes de arrancar
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
