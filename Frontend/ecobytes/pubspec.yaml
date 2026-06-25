@@ -1,0 +1,39 @@
+name: ecobytes
+description: "EcoBytes — Monitoreo de calidad del aire en Cali, Colombia."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Navegación
+  go_router: ^15.1.2
+
+  # Tipografía
+  google_fonts: ^6.2.1
+
+  # Gestión de estado (preparado para datos en tiempo real)
+  flutter_bloc: ^9.1.1
+  equatable: ^2.0.7
+
+  # Mapa interactivo
+  flutter_map: ^8.1.1
+  latlong2: ^0.9.1
+
+  # Gráficos de líneas (vista detalle móvil)
+  fl_chart: ^0.70.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
