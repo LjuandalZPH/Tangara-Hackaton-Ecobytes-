@@ -82,6 +82,8 @@ class LandingHeader extends StatelessWidget {
   }
 }
 
+
+
 class LandingMobileNav extends StatelessWidget {
   const LandingMobileNav({super.key});
 
@@ -91,14 +93,17 @@ class LandingMobileNav extends StatelessWidget {
       width: double.infinity,
       color: AppColors.surfaceMuted,
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        children: [
-          for (final link in landingNavLinks)
-            ListTile(
-              title: Text(link.$1),
-              onTap: () => context.go(link.$2),
-            ),
-        ],
+      child: Material(
+        color: Colors.transparent, 
+        child: Column(
+          children: [
+            for (final link in landingNavLinks)
+              ListTile(
+                title: Text(link.$1),
+                onTap: () => context.go(link.$2),
+              ),
+          ],
+        ),
       ),
     );
   }
