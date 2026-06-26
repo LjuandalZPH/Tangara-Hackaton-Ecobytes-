@@ -34,14 +34,14 @@ const _contaminantes = <(String, String, String, String)>[
     'HR',
     'Humedad relativa',
     'No es un contaminante, pero influye en cómo se sienten y dispersan las partículas en el aire. Útil para interpretar el resto de las métricas.',
-    '30–60 ideal',
+    '30-60 ideal',
   ),
 ];
 
 const _nivelesAqi = <(Color, String, String, String)>[
-  (Color(0xFF81C784), '0–50', 'Bueno', 'El aire no representa riesgo. Ideal para actividades al aire libre sin restricciones.'),
-  (Color(0xFFFFB74D), '51–100', 'Moderado', 'Aceptable para la mayoría. Grupos sensibles podrían notar síntomas leves.'),
-  (Color(0xFFFF8A65), '101–150', 'Dañino para sensibles', 'Niños, adultos mayores y personas con afecciones respiratorias deben reducir el esfuerzo prolongado al aire libre.'),
+  (Color(0xFF81C784), '0-50', 'Bueno', 'El aire no representa riesgo. Ideal para actividades al aire libre sin restricciones.'),
+  (Color(0xFFFFB74D), '51-100', 'Moderado', 'Aceptable para la mayoría. Grupos sensibles podrían notar síntomas leves.'),
+  (Color(0xFFFF8A65), '101-150', 'Dañino para sensibles', 'Niños, adultos mayores y personas con afecciones respiratorias deben reducir el esfuerzo prolongado al aire libre.'),
   (Color(0xFFE57373), '151+', 'Dañino', 'Toda la población puede verse afectada. Se recomienda evitar actividad física intensa al aire libre.'),
 ];
 

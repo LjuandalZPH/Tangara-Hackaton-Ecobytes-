@@ -1,10 +1,13 @@
+import 'package:ecobytes/features/landing/presentation/pages/landing_page.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
-import 'features/dashboard/presentation/pages/dashboard_map_page.dart';
-import 'features/landing/presentation/pages/landing_page.dart';
+
+import '../../features/dashboard/presentation/pages/map_page.dart'; 
+import 'features/chatbot/presentation/pages/chatbot_page.dart'; 
+import 'features/learn/presentation/pages/learn_page.dart';     
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -19,17 +22,15 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: AppRoutes.dashboard,
-      builder: (context, state) => const DashboardMapPage(),
+      builder: (context, state) => const MapaPage(),
     ),
     GoRoute(
       path: AppRoutes.learn,
-      builder: (context, state) =>
-          const PlaceholderPage(title: 'Aprende'),
+      builder: (context, state) => const LearnPage(), 
     ),
     GoRoute(
       path: AppRoutes.chatbot,
-      builder: (context, state) =>
-          const PlaceholderPage(title: 'Chatbot'),
+      builder: (context, state) => const ChatbotPage(), 
     ),
   ],
 );
