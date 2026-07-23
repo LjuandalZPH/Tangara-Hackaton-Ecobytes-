@@ -155,12 +155,15 @@ El orden importa: varios pasos del backlog original (`T-00.4`, eliminar landing)
 
 ## 4. Integración backend↔frontend
 
-**Desbloqueado.** La sección 2 ya entregó `/sectors`, `/sectors/{id}`, `/risk/{sector}` y `/education` funcionando contra datos reales. Esta es ahora la siguiente tarea del proyecto:
+✅ **Ejecutado (2026-07-23).** Detalle completo en [`07-Integracion-Backend-Frontend.md`](./07-Integracion-Backend-Frontend.md).
 
-- [ ] Reemplazar `MockSensorRepository` por un cliente HTTP real contra el backend (dentro de `SensorBloc` o el repositorio que se decida en el paso 5 de la sección 3).
-- [ ] Confirmar CORS del backend contra el dominio de desarrollo del frontend (`T-00.7` del backlog). El default de `CORS_ORIGINS` es **vacío a propósito** (fail-closed, DoD §8): hay que declarar el origen de Flutter web en `.env` o el navegador bloqueará las llamadas.
-- [ ] Verificar el polling de 30-60s contra el backend real (hoy no hay polling real porque no hay llamada real).
-- [ ] Modelar en el frontend el estado `gris` / `sin_datos_recientes`: 15 de las 22 comunas no tienen sensores, así que no es un caso raro sino el caso mayoritario.
+- [x] Cliente HTTP real contra el backend: `core/data/api_client.dart` + `SectorsProvider` / `RiskProvider`. Se migró a **Provider** como exige `04-Arquitectura-Frontend.md` y se eliminó `presentation/bloc/` (era código muerto, cero referencias externas); `flutter_bloc` salió de `pubspec.yaml`.
+- [x] **CORS confirmado (`T-00.7`)**: verificado con origen permitido (devuelve la cabecera), preflight `OPTIONS` (200) y origen no permitido (no la devuelve). El default de `CORS_ORIGINS` es **vacío a propósito** (fail-closed, DoD §8), y `main.py` avisa al arrancar si queda vacío.
+- [x] Polling real cada 45 s (dentro del rango 30-60 s). Los refrescos no muestran spinner para no parpadear, y si uno falla conservan los datos previos.
+- [x] Estado `gris` / `sin_datos_recientes` modelado: `EstadoSector.gris` con la etiqueta "Sin datos" en la leyenda, más una línea de cobertura real calculada de los datos.
+- [x] `MapaPage` deja de mostrar el placeholder: `MapArea` pinta los 22 polígonos con `PolygonLayer`. Se eliminaron los datos inventados que tenía (5 sectores ficticios, grilla decorativa, "AQI promedio: 32").
+
+**Queda abierto** (ver `07-Integracion-Backend-Frontend.md` §8): `GET /sectors/{id}` y `GET /risk/{sector}` no tienen UI todavía, `GET /education` sigue sin conectar, `_SidePanelSection` conserva datos falsos, y `features/landing/` sigue con `MockSensorRepository`.
 
 ---
 

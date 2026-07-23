@@ -19,9 +19,12 @@ dependencies:
   # Tipografía
   google_fonts: ^6.2.1
 
-  # Gestión de estado (preparado para datos en tiempo real)
-  flutter_bloc: ^9.1.1
+  # Gestión de estado
+  provider: ^6.1.2
   equatable: ^2.0.7
+
+  # Cliente HTTP para consumir el backend
+  http: ^1.2.2
 
   # Mapa interactivo
   flutter_map: ^8.1.1
