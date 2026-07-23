@@ -24,9 +24,9 @@
 - `services/calibration.py` — la corrección de PM2.5 por humedad, lógica de dominio pura, independiente de qué base de datos quede debajo. **Importante:** hay que verificar si la fórmula ya se aplica en algún punto del pipeline Tángara antes de aplicarla otra vez (evitar doble calibración) — ver hallazgo de la sección 2.
 - `routers/sensors.py` — su lógica de negocio (última lectura, historial, WebSocket) es reutilizable como referencia, aunque hay que reescribir el acceso a datos por debajo (de SQLAlchemy/Postgres a ClickHouse).
 
-**Lo que se retira sin ambigüedad, independiente de la base de datos:** los stubs `auth.py`, `chatbot.py`, `game.py` y los modelos `User`, `GameScore` — fuera del alcance documentado, sin consumidor en el frontend (cero referencias a gamificación en todo `lib/`).
+**Lo que se retira sin ambigüedad, independiente de la base de datos:** los stubs `auth.py`, `chatbot.py`, `game.py` y los modelos `User`, `GameScore` — fuera del alcance documentado, sin consumidor en el frontend (cero referencias a gamificación en todo `lib/`). ✅ **Ejecutado (2026-07-22):** routers y modelos eliminados; `requirements.txt` sin `langchain`/`langchain-openai`/`langchain-anthropic`/`python-jose`/`passlib`; `main.py` sin sus imports/`include_router`; `.env.example` y `Settings` (`db/database.py`) sin las variables `JWT_*`/`LLM_PROVIDER`/`ANTHROPIC_API_KEY`/`OPENAI_API_KEY`.
 
-**Lo que se retira porque ya no aplica al migrar a ClickHouse:** `db/database.py`, `models/sensor.py` (el modelo SQLAlchemy de `SensorReading`), y `scripts/ingest_csv.py` (la ingesta por CSV a Postgres deja de tener sentido si los datos ya están en ClickHouse vía el pipeline InfluxDB→ClickHouse existente).
+**Lo que se retira porque ya no aplica al migrar a ClickHouse:** `db/database.py`, `models/sensor.py` (el modelo SQLAlchemy de `SensorReading`), y `scripts/ingest_csv.py` (la ingesta por CSV a Postgres deja de tener sentido si los datos ya están en ClickHouse vía el pipeline InfluxDB→ClickHouse existente). ✅ **Ejecutado (2026-07-22):** carpeta `db/` completa, `models/sensor.py` y `scripts/ingest_csv.py` eliminados; reemplazados por `services/clickhouse_client.py` (detalle técnico en §2.2).
 
 ---
 
@@ -61,10 +61,39 @@ CLICKHOUSE_DATABASE=tangara_plata          # no tangara_gold — ver 2.1
 CLICKHOUSE_SECURE=True
 ```
 
-- [x] Conseguir credenciales propias para EcoBytes — hay un `.env` funcional en el entorno de desarrollo: el backend consulta ClickHouse y devuelve datos reales (verificado 2026-07-23, ver nota de verificación al final de §2.4). Queda pendiente confirmar si el usuario es propio de EcoBytes o el "usuario_analista" genérico.
-- [x] Añadir `clickhouse-connect` a `requirements.txt`, retirando `asyncpg`, `sqlalchemy[asyncio]`, `alembic`.
-- [x] **Verificado:** `clickhouse-connect` **sí** expone un cliente async nativo (`get_async_client()`), así que **no** hace falta `run_in_threadpool`. Se usa el extra `clickhouse-connect[async]` (instala `aiohttp`). El cliente es un singleton perezoso que se cierra en el `shutdown` de FastAPI.
-- [x] Implementar `services/clickhouse_client.py` con nombres de tabla/columna reales (`tangara_plata.plata_tangara_sensores`, columnas `name`/`time`/`pm25`/`co2`/`hum`). Expone `ultimo_promedio_por_sensor()`, `posiciones_sensores()`, `promedio_mensual()` y `dias_sobre_limite()`.
+- [x] **Conseguir credenciales propias para EcoBytes** — confirmado por el equipo (2026-07-22), ya disponibles.
+- [x] **Añadir `clickhouse-connect` a `requirements.txt`, retirando `asyncpg`, `sqlalchemy[asyncio]`, `alembic`** — hecho (2026-07-22), instalado como `clickhouse-connect[async]==1.5.0`. También se retiraron `pandas` y `scikit-learn` (dead weight: solo los usaba `scripts/ingest_csv.py`, ya eliminado, o no se usaban en ningún lado).
+- [x] **Verificado:** `clickhouse-connect` sí expone un cliente async nativo (`clickhouse_connect.get_async_client()`, extra `[async]`, backed por `aiohttp`) desde al menos la versión 1.5.0 — no hace falta envolver llamadas síncronas con `run_in_threadpool` como sugería el esqueleto original de `03-Arquitectura-Backend.md` §4. Verificado contra la documentación oficial de ClickHouse Connect (julio 2026).
+- [x] **Implementado `services/clickhouse_client.py`** con nombres de tabla/columna reales (`tangara_plata.plata_tangara_sensores`, columnas `name`/`time`/`pm25`/`co2`/`hum`/`tmp`), confirmados además contra `ARCHITECTURE.md` del repo real del pipeline (`sebaxtian/clickhouse-tangara`, rama `master`) el mismo día. `routers/sensors.py` fue reescrito para consultarlo (`GET /latest` con `argMax(...)` agrupado por sensor — necesario porque `ReplacingMergeTree` deduplica de forma eventual, no en cada lectura; `GET /{sensor_id}/history` con parámetros server-side `{nombre:Tipo}`). Se agregó `pygeohash` para decodificar la columna `geo` a lat/lon — el formato de esa columna **sigue sin confirmación oficial** en el repo del pipeline (no hay ejemplo de valor real ni mención de "geohash" en su documentación), así que la decodificación está envuelta en `try/except` con fallback a `None` en vez de asumir que siempre funciona.
+- [x] **Validado contra datos reales (2026-07-23):** corrido con Docker (`docker compose up`, credenciales reales) contra ClickHouse. `GET /sensors/latest` devuelve 62 sensores con coordenadas dentro del bounding box de Cali — confirma que `geo` sí es geohash estándar. `GET /sensors/{id}/history` y `WS /ws/live` (ping/pong) también verificados con datos reales.
+- [x] **Hallazgo de la validación — desborde de `hours` en `/history` (2026-07-23):** pedir `hours=999999` devolvía 404 en vez de datos. Causa: ClickHouse guarda `DateTime` como `UInt32` (rango 1970–2106); `now() - INTERVAL {hours} HOUR` con un valor muy grande cruza por debajo de 1970-01-01 y da la vuelta (wraparound) a una fecha futura, así que la query no encuentra nada. Corregido acotando `hours` a `(0, 490_000]` (`Query(gt=0, le=MAX_HISTORY_HOURS)` en `routers/sensors.py`) — devuelve 422 en vez de fallar en silencio. Verificado el borde exacto (`hours=490000` → 200, `hours=999999` → 422, `hours=-5` → 422).
+
+**Nota — alcance de aquella migración (superado el 2026-07-23):** el trabajo del 2026-07-22 fue deliberadamente un *swap* de la fuente de datos, dejando `routers/sensors.py` con su contrato anterior. La rama `feature/backend-clickhouse` completó después la fase que quedaba pendiente (sectorización + los 4 endpoints, §2.4) y **retiró `routers/sensors.py`, el WebSocket `/ws/live` y `pygeohash`**:
+
+- `/sensors/*` y `/ws/live` no aparecen en ningún documento de arquitectura. `01-Arquitectura.md` y `04-Arquitectura-Frontend.md` especifican polling REST cada 30-60 s (`Timer.periodic`), no una conexión persistente.
+- `pygeohash` sobra: la decodificación se resuelve con `geohashDecode()` dentro de la propia query de ClickHouse (server-side), sin dependencia extra ni `try/except` en Python.
+
+**Lo que sí se conserva de esa validación**, porque sigue siendo cierto y útil:
+
+- La columna `geo` **es geohash estándar** — confirmado empíricamente con 62 sensores dentro del bounding box de Cali. Esto es justamente lo que habilita usar `geohashDecode()` en SQL con confianza.
+- **Cuidado con `DateTime` como `UInt32` en ClickHouse** (rango 1970–2106): `now() - INTERVAL {n} HOUR` con un `n` grande cruza por debajo de 1970 y da la vuelta, devolviendo vacío en vez de fallar. Hoy no aplica —`risk.py` usa `INTERVAL 1 YEAR` fijo, sin parámetro de usuario— pero si en el futuro algún endpoint acepta un rango de fechas por query param, hay que acotarlo (el valor usado entonces fue `490_000` horas).
+
+- [x] **Verificado:** `clickhouse-connect` **sí** expone un cliente async nativo (`get_async_client()`, extra `[async]`, sobre `aiohttp`), así que **no** hace falta `run_in_threadpool`. El cliente es un singleton perezoso que se cierra en el `shutdown` de FastAPI.
+- [x] **`services/clickhouse_client.py` en su forma final:** expone `ultimo_promedio_por_sensor()`, `posiciones_sensores()`, `promedio_mensual()` y `dias_sobre_limite()`. Es además el único punto donde se aplica la calibración de PM2.5 (ver §2.5).
+- [x] **`.env` funcional verificado (2026-07-23):** el backend consulta ClickHouse y devuelve datos reales. Queda por confirmar si el usuario es propio de EcoBytes o el `usuario_analista` genérico.
+
+### 2.5 ✅ Decisión tomada: se aplica calibración de PM2.5 por humedad
+
+**Decisión (2026-07-23): se calibra, y no se expone PM2.5 crudo en ningún endpoint.**
+
+- `services/calibration.py` se conserva (portado desde la línea de trabajo de `develop`, renombrado a `calibrar_pm25` por consistencia con el español del resto del backend). `K_FACTOR = 0.24`, fórmula de Dillo et al.
+- Se descartan `calibrate_batch` (dependía de `numpy` para la ingesta CSV por lotes, que ya no existe) y `get_alert_level` (redundante: `sectors.py` ya clasifica verde/amarillo/rojo con los umbrales OMS de `03-Arquitectura-Backend.md` §3; no se reemplaza ese esquema por uno de 6 niveles). **No se reintroduce `numpy`** — la fórmula es escalar.
+- **La calibración se aplica una sola vez, dentro de `services/clickhouse_client.py`**, no en los routers: así el crudo nunca llega a `sectors.py`/`risk.py`, que consumen `pm25_promedio` sin saber que la corrección existe.
+- `dias_sobre_limite()` **ya no puede filtrar con `HAVING` en SQL**: la corrección no es lineal, así que filtrar sobre el `avg(pm25)` crudo daría un conjunto de días distinto. Se traen los promedios diarios (~365 filas) y se cuenta en Python.
+- `hum_promedio` se conserva en la respuesta de `/sectors/{id}`: es una lectura ambiental legítima por sí misma, no un "crudo de PM2.5".
+
+- [ ] ⚠️ **Riesgo abierto — doble calibración.** Nadie ha verificado si el pipeline de Tángara ya aplica esta misma corrección al construir la capa Plata. Si lo hiciera, estaríamos corrigiendo dos veces y los valores saldrían artificialmente bajos. Anotado también como aviso en el propio `services/calibration.py`.
+- [ ] Validar `K_FACTOR` con el equipo de Electrónica (T-01.1) — hoy es un valor empírico sin confirmar.
 
 ### 2.3 Catálogo sensor→sector: confirmado que no existe listo, hay que construirlo
 
@@ -153,4 +182,4 @@ El orden importa: varios pasos del backlog original (`T-00.4`, eliminar landing)
                 └── Frontend: /riesgo nuevo, ya contra backend real (paso 10, sección 3)
 ```
 
-La limpieza del frontend (pasos 1-3 y 6-9) y la limpieza de scope del backend (auth/chatbot/game) no dependen de nada más y se pueden empezar ya, en paralelo. Conseguir las credenciales reales de ClickHouse y confirmar el catálogo sensor→sector (2.2, 2.3) son los dos bloqueantes concretos antes de poder escribir `clickhouse_client.py` de verdad.
+La limpieza del frontend (pasos 1-3 y 6-9) y la limpieza de scope del backend (auth/chatbot/game, ✅ ya ejecutada — ver sección 1) no dependen de nada más y se pueden empezar ya, en paralelo. Conseguir las credenciales reales de ClickHouse y confirmar el catálogo sensor→sector (2.2, 2.3) son los dos bloqueantes concretos antes de poder escribir `clickhouse_client.py` de verdad.

@@ -7,12 +7,18 @@ ver 03-Arquitectura-Backend.md— asume `tangara_gold`, una capa ya
 agregada que no existe todavía). El backend es de solo lectura: nunca
 escribe en ClickHouse, la ingesta es responsabilidad del pipeline de
 Tángara, fuera de este repositorio.
+
+Este módulo es también el único lugar donde se aplica la calibración de
+PM2.5 por humedad (`services/calibration.py`): el valor crudo nunca sale
+de aquí hacia los routers, así que `sectors.py` y `risk.py` consumen
+siempre `pm25_promedio` ya corregido, sin saber que la corrección existe.
 """
 
 import clickhouse_connect
 from clickhouse_connect.driver.asyncclient import AsyncClient
 
 from config import settings
+from services.calibration import calibrar_pm25
 
 TABLA = "plata_tangara_sensores"
 
@@ -60,8 +66,15 @@ async def ultimo_promedio_por_sensor() -> list[dict]:
         WHERE time >= now() - INTERVAL 1 HOUR
         GROUP BY name
     """
-    result = await client.query(query)
-    return _rows_to_dicts(result)
+    filas = _rows_to_dicts(await client.query(query))
+
+    # Calibración por humedad: la misma query ya trae hum_promedio.
+    # hum_promedio se conserva en la respuesta porque es una lectura
+    # ambiental legítima por sí misma, no un "crudo de PM2.5".
+    for fila in filas:
+        fila["pm25_promedio"] = calibrar_pm25(fila["pm25_promedio"], fila["hum_promedio"])
+
+    return filas
 
 
 async def posiciones_sensores() -> list[dict]:
@@ -85,42 +98,70 @@ async def posiciones_sensores() -> list[dict]:
 
 
 async def promedio_mensual(sensores: list[str]) -> list[dict]:
-    """Promedio de PM2.5 por mes (último año) para un conjunto de sensores."""
+    """
+    Promedio de PM2.5 por mes (último año) para un conjunto de sensores,
+    ya calibrado por humedad.
+
+    Se pide `avg(hum)` junto al PM2.5 solo para poder calibrar; la humedad
+    auxiliar se descarta del resultado porque `risk.py` no la usa.
+    """
     if not sensores:
         return []
     client = await get_client()
     query = f"""
         SELECT
             toStartOfMonth(time) AS mes,
-            avg(pm25) AS pm25_promedio
+            avg(pm25) AS pm25_promedio,
+            avg(hum) AS hum_promedio
         FROM {settings.clickhouse_database}.{TABLA}
         WHERE name IN {{sensores:Array(String)}}
           AND time >= now() - INTERVAL 1 YEAR
         GROUP BY mes
         ORDER BY mes
     """
-    result = await client.query(query, parameters={"sensores": sensores})
-    return _rows_to_dicts(result)
+    filas = _rows_to_dicts(await client.query(query, parameters={"sensores": sensores}))
+
+    return [
+        {
+            "mes": fila["mes"],
+            "pm25_promedio": calibrar_pm25(fila["pm25_promedio"], fila["hum_promedio"]),
+        }
+        for fila in filas
+    ]
 
 
 async def dias_sobre_limite(sensores: list[str], umbral: float) -> int:
     """
-    Cuenta los días (último año) en los que el promedio diario de PM2.5,
-    agregando todos los sensores del sector, superó `umbral`.
+    Cuenta los días (último año) en los que el promedio diario de PM2.5
+    calibrado, agregando todos los sensores del sector, superó `umbral`.
+
+    El conteo NO puede resolverse con `HAVING` en SQL: la calibración por
+    humedad no es lineal, así que filtrar sobre `avg(pm25)` crudo daría un
+    conjunto de días distinto al que resulta de calibrar primero. Se traen
+    los promedios diarios y se cuenta en Python. Son ~365 filas como máximo,
+    así que el costo es despreciable.
     """
     if not sensores:
         return 0
     client = await get_client()
     query = f"""
-        SELECT toDate(time) AS dia, avg(pm25) AS pm25_promedio
+        SELECT
+            toDate(time) AS dia,
+            avg(pm25) AS pm25_promedio,
+            avg(hum) AS hum_promedio
         FROM {settings.clickhouse_database}.{TABLA}
         WHERE name IN {{sensores:Array(String)}}
           AND time >= now() - INTERVAL 1 YEAR
         GROUP BY dia
-        HAVING avg(pm25) > {{umbral:Float64}}
     """
-    result = await client.query(query, parameters={"sensores": sensores, "umbral": umbral})
-    return len(result.result_rows)
+    filas = _rows_to_dicts(await client.query(query, parameters={"sensores": sensores}))
+
+    return sum(
+        1
+        for fila in filas
+        if (pm25 := calibrar_pm25(fila["pm25_promedio"], fila["hum_promedio"])) is not None
+        and pm25 > umbral
+    )
 
 
 def _rows_to_dicts(result) -> list[dict]:
