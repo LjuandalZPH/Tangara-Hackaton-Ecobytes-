@@ -4,59 +4,74 @@
 
 EcoBytes es una plataforma de monitoreo de calidad del aire diseñada para hacer que los datos ambientales urbanos sean accesibles, comprensibles y accionables para cualquier persona — no solo para científicos o funcionarios públicos.
 
-Desarrollado por el equipo **Bit&Volt Labs** para la **Tangara Hackaton**.
+Desarrollado por el equipo **Bit&Volt Labs** para la **Tángara Hackathon**.
 
 ---
 
 ## ¿Qué problema resuelve?
 
-En muchas ciudades, los datos de calidad del aire existen: hay sensores, hay mediciones, hay reportes. Pero esa información vive en bases de datos técnicas, en documentos gubernamentales o en plataformas difíciles de interpretar. El ciudadano común no sabe qué tan peligroso es el aire de su barrio hoy, ni si debería salir a correr, ni qué decisiones cotidianas contribuyen a empeorar o mejorar la situación.
+En Cali los datos de calidad del aire existen — la red Tángara lleva años midiendo minuto a minuto en barrios, colegios y comunidades donde ninguna entidad oficial tiene presencia. Pero esa información vive en una base de datos técnica, difícil de interpretar para alguien que no es científico de datos.
 
-EcoBytes cierra esa brecha.
+EcoBytes cierra esa brecha apoyándose directamente en el pipeline analítico que ya existe detrás de Tángara (InfluxDB → ClickHouse, arquitectura Medallón), en vez de reconstruirlo desde cero.
 
 ---
 
 ## ¿Qué hace?
 
-### 🗺️ Mapa en tiempo real
+### 🗺️ Mapa por sectores
 
-Visualiza la calidad del aire por sectores de la ciudad. De un vistazo puedes ver qué zonas tienen niveles saludables y cuáles están en alerta, con datos actualizados en tiempo real desde sensores urbanos.
+Un mapa de Cali donde cada sector se colorea según su calidad del aire actual — verde, amarillo o rojo — con datos que se refrescan automáticamente. Tocar un sector muestra sus valores exactos de PM2.5, CO2 y humedad.
 
-### 💬 Pregúntale al aire
+### 📍 El riesgo en tu dirección
 
-Un chatbot integrado te permite hacer preguntas en lenguaje natural: *"¿Cómo está el sector norte hoy?"* o *"¿Cuál fue la peor hora del día ayer en el centro?"*. No necesitas interpretar gráficas ni buscar tablas — simplemente pregunta.
+Eliges tu barrio y recibes un perfil histórico de calidad del aire para ese punto: peor mes, mejor mes, promedio anual y cuántos días al año se supera la norma OMS. Pensado para padres, pacientes con condiciones respiratorias y cualquiera que quiera saber qué tan seguro es el aire donde vive.
 
 ### 📚 Entiende lo que respiras
 
-Una sección educativa explica de forma clara qué son el PM2.5 y el CO2, cómo afectan tu salud y qué acciones concretas puedes tomar. Sin tecnicismos innecesarios.
-
-### 🎮 Aprende jugando
-
-Un videojuego integrado te pone en el lugar de un ciudadano tomando decisiones urbanas cotidianas — transporte, consumo, energía — y te muestra en tiempo real cómo esas decisiones impactan la calidad del aire de tu ciudad.
+Una pantalla clara que explica qué son el PM2.5 y el CO2, cómo afectan la salud y qué acciones concretas se pueden tomar — sin tecnicismos innecesarios.
 
 ---
 
 ## ¿Para quién es?
 
-EcoBytes está pensado para cualquier persona que viva, trabaje o estudie en la ciudad:
-
 - **Ciudadanos** que quieren saber si el aire de su barrio es seguro hoy.
-- **Padres y cuidadores** que deciden si sus hijos pueden jugar afuera.
-- **Estudiantes** que aprenden sobre medio ambiente de forma interactiva.
+- **Padres, cuidadores y pacientes vulnerables** que necesitan un perfil de riesgo por dirección.
+- **Estudiantes** que aprenden sobre medio ambiente de forma clara.
 - **Investigadores y periodistas** que necesitan datos locales confiables y accesibles.
 - **Ciclistas y deportistas** que planifican sus rutas según la calidad del aire.
 
 ---
 
-## El equipo
+## Cómo está construido
 
-**Bit&Volt Labs** es un equipo de cinco estudiantes de ingeniería de la Universidad del Valle (Cali, Colombia), con perfiles en Ingeniería de Sistemas e Ingeniería Electrónica. Nos une la convicción de que la tecnología tiene más valor cuando resuelve problemas reales para personas reales.
+EcoBytes se diseñó con un principio simple: **velocidad de desarrollo sobre completitud de features.** Eso se traduce en un alcance enfocado en el valor central del producto:
+
+- **Acceso abierto** — cualquier persona entra y usa la app sin crear una cuenta ni iniciar sesión.
+- **Geometría simple** — los sectores de Cali son un conjunto fijo de polígonos; se resuelven con un archivo GeoJSON estático más una librería de geometría (`shapely`).
+- **Datos frescos por refresco periódico** — el mapa se actualiza automáticamente cada 30-60 segundos.
+- **Una sola aplicación Flutter, compilada exclusivamente a web** — accesible desde el navegador tanto en desktop como en teléfono, sin apps que instalar.
+- **ClickHouse como única fuente de datos de sensores** — se reutiliza directamente la capa Gold del pipeline Tángara (ya calibrada y agregada), sin duplicar ingesta ni almacenamiento propio.
+
+**Stack:**
+
+| Capa | Tecnología |
+| --- | --- |
+| Datos históricos | InfluxDB → ClickHouse (pipeline Tángara, arquitectura Medallón) |
+| Backend | FastAPI (Python), un único servicio sin estado propio |
+| Frontend | Flutter (Dart), compilado solo a web |
+
+Documentación técnica completa:
+
+1. [`01-Arquitectura.md`](./01-Arquitectura.md) — visión general del sistema y decisiones de diseño.
+2. [`02-Backlog.md`](./02-Backlog.md) — épicas e historias de usuario.
+3. [`03-Arquitectura-Backend.md`](./03-Arquitectura-Backend.md) — diseño detallado del servicio FastAPI.
+4. [`04-Arquitectura-Frontend.md`](./04-Arquitectura-Frontend.md) — diseño detallado de la app Flutter.
 
 ---
 
-## Estado del proyecto
+## El equipo
 
-EcoBytes fue desarrollado en el marco de la **Tangara Hackaton**, en un ciclo de 6 semanas bajo metodología Scrum. El MVP cubre monitoreo en tiempo real, mapa sectorizado, chatbot ambiental, sección educativa y módulo de gamificación.
+**Bit&Volt Labs** es un equipo de cinco estudiantes de ingeniería de la Universidad del Valle (Cali, Colombia), con perfiles en Ingeniería de Sistemas e Ingeniería Electrónica.
 
 ---
 
