@@ -1,0 +1,69 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": "comuna-2", "nombre": "Comuna 2" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-76.545, 3.450],
+            [-76.520, 3.450],
+            [-76.520, 3.470],
+            [-76.545, 3.470],
+            [-76.545, 3.450]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "comuna-3", "nombre": "Comuna 3" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-76.545, 3.430],
+            [-76.520, 3.430],
+            [-76.520, 3.450],
+            [-76.545, 3.450],
+            [-76.545, 3.430]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "comuna-17", "nombre": "Comuna 17" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-76.545, 3.370],
+            [-76.520, 3.370],
+            [-76.520, 3.400],
+            [-76.545, 3.400],
+            [-76.545, 3.370]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "comuna-20", "nombre": "Comuna 20" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-76.560, 3.390],
+            [-76.545, 3.390],
+            [-76.545, 3.410],
+            [-76.560, 3.410],
+            [-76.560, 3.390]
+          ]
+        ]
+      }
+    }
+  ]
+}

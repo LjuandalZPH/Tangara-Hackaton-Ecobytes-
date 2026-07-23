@@ -1,5 +1,5 @@
 # Variables de entorno — NUNCA subir al repo
-backend/.env
+.env
 
 # Python
 __pycache__/
@@ -15,11 +15,6 @@ build/
 
 # Docker
 *.log
-
-# Datos CSV de Tángara (pueden ser pesados)
-backend/data/
-*.csv
-*.csv.gz
 
 # IDEs
 .idea/

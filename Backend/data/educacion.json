@@ -1,0 +1,40 @@
+{
+  "contaminantes": [
+    {
+      "id": "pm25",
+      "nombre": "Material Particulado PM2.5",
+      "descripcion": "Partículas sólidas o líquidas suspendidas en el aire con un diámetro menor a 2.5 micrómetros (unas 30 veces más pequeñas que un cabello humano). Provienen principalmente de la quema de combustibles fósiles, incendios forestales, actividad industrial y tráfico vehicular.",
+      "efectos_en_salud": [
+        "Penetran profundamente en los pulmones y pueden llegar al torrente sanguíneo.",
+        "Agravan asma, bronquitis y otras enfermedades respiratorias crónicas.",
+        "Aumentan el riesgo de enfermedades cardiovasculares e infartos.",
+        "La exposición prolongada se asocia con menor esperanza de vida."
+      ],
+      "limites_oms": {
+        "promedio_24h_ug_m3": 15,
+        "promedio_anual_ug_m3": 5,
+        "fuente": "Guías mundiales de calidad del aire de la OMS, 2021"
+      }
+    },
+    {
+      "id": "co2",
+      "nombre": "Dióxido de Carbono (CO2)",
+      "descripcion": "Gas producido por la respiración, la combustión y procesos industriales. En espacios abiertos no suele ser un riesgo directo para la salud en las concentraciones típicas, pero en ambientes cerrados sirve como indicador de ventilación: niveles altos señalan poco recambio de aire (y, por lo tanto, mayor concentración de otros contaminantes).",
+      "efectos_en_salud": [
+        "En concentraciones muy altas (espacios cerrados mal ventilados) puede causar dolor de cabeza, somnolencia y dificultad para concentrarse.",
+        "Es un indicador indirecto de la calidad de la ventilación de un espacio."
+      ],
+      "limites_oms": {
+        "nota": "La OMS no fija un límite específico de CO2 ambiental exterior; se usa principalmente como referencia de calidad del aire interior (valores por debajo de 1000 ppm se consideran aceptables en interiores)."
+      }
+    }
+  ],
+  "recomendaciones": [
+    "Consulta el mapa antes de salir a hacer ejercicio al aire libre, especialmente si el sector está en estado rojo o amarillo.",
+    "Si tienes asma u otra condición respiratoria, evita actividades intensas al aire libre en los días con peor calidad del aire.",
+    "Ventila tu hogar en las horas del día con mejor calidad del aire reportada.",
+    "Usa tapabocas con filtro (tipo N95 o similar) si debes exponerte en zonas con niveles altos de PM2.5 durante periodos prolongados.",
+    "Evita quemas a cielo abierto: son una de las principales fuentes de PM2.5 en Cali y el Valle del Cauca."
+  ],
+  "fuente": "Organización Mundial de la Salud (OMS) — Guías mundiales de calidad del aire, 2021 (https://www.who.int/publications/i/item/9789240034228)"
+}
