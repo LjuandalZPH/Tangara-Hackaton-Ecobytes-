@@ -24,6 +24,14 @@ class SectorsProvider extends ChangeNotifier {
   String? _sectorSeleccionadoId;
   Timer? _timer;
 
+  /// Evita notificar tras `dispose()`: el timer se cancela ahí, pero una
+  /// petición ya en vuelo puede resolverse después y `notifyListeners()`
+  /// sobre un ChangeNotifier destruido lanza en modo debug.
+  bool _destruido = false;
+
+  /// Evita peticiones simultáneas (ej. doble tap en "Reintentar").
+  bool _peticionEnCurso = false;
+
   EstadoCarga get estado => _estado;
   List<Sector> get sectores => _sectores;
   String? get mensajeError => _mensajeError;
@@ -45,6 +53,8 @@ class SectorsProvider extends ChangeNotifier {
   /// Carga inicial de sectores. Muestra el estado "cargando" y arranca
   /// el polling periódico.
   Future<void> cargar() async {
+    if (_peticionEnCurso) return;
+
     _estado = EstadoCarga.cargando;
     _mensajeError = null;
     notifyListeners();
@@ -63,6 +73,9 @@ class SectorsProvider extends ChangeNotifier {
   /// si un refresco falla, se conservan los datos previos y solo se
   /// expone el mensaje de error.
   Future<void> _fetch() async {
+    if (_peticionEnCurso) return;
+    _peticionEnCurso = true;
+
     try {
       final sectores = await _apiClient.getSectores();
       _sectores = sectores;
@@ -79,12 +92,17 @@ class SectorsProvider extends ChangeNotifier {
       if (_sectores.isEmpty) {
         _estado = EstadoCarga.error;
       }
+    } finally {
+      _peticionEnCurso = false;
     }
+
+    if (_destruido) return;
     notifyListeners();
   }
 
   @override
   void dispose() {
+    _destruido = true;
     _timer?.cancel();
     super.dispose();
   }

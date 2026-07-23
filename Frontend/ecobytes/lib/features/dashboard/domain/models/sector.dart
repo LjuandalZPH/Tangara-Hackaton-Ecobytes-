@@ -73,6 +73,15 @@ class Sector {
   /// ya convertidos a [LatLng] en el orden esperado por flutter_map.
   final List<List<LatLng>> poligonos;
 
+  /// Si el sector tiene una medición actual y confiable que mostrar.
+  ///
+  /// Hay que comprobar las dos condiciones: `sinDatosRecientes` indica que el
+  /// dato no es actual, pero **no** garantiza que `pm25Promedio` sea nulo — un
+  /// sector con sensores cuya última lectura es vieja llega en gris y con el
+  /// último valor conocido (ver `routers/sectors.py` y
+  /// `07-Integracion-Backend-Frontend.md` §3).
+  bool get tieneDatos => !sinDatosRecientes && pm25Promedio != null;
+
   factory Sector.fromJson(Map<String, dynamic> json) {
     return Sector(
       id: json['id'] as String? ?? '',

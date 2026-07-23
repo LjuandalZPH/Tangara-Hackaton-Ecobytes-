@@ -39,8 +39,7 @@ class MapArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sectoresConDatos =
-        sectores.where((s) => !s.sinDatosRecientes).length;
+    final sectoresConDatos = sectores.where((s) => s.tieneDatos).length;
 
     return Stack(
       children: [
@@ -76,7 +75,10 @@ class MapArea extends StatelessWidget {
         Positioned(
           left: AppSpacing.md,
           bottom: AppSpacing.md,
-          child: _MapLegend(coberturaSectores: sectoresConDatos),
+          child: _MapLegend(
+            coberturaSectores: sectoresConDatos,
+            totalSectores: sectores.length,
+          ),
         ),
       ],
     );
@@ -99,9 +101,13 @@ class MapArea extends StatelessWidget {
 }
 
 class _MapLegend extends StatelessWidget {
-  const _MapLegend({required this.coberturaSectores});
+  const _MapLegend({
+    required this.coberturaSectores,
+    required this.totalSectores,
+  });
 
   final int coberturaSectores;
+  final int totalSectores;
 
   static const _entradas = [
     (EstadoSector.verde, 'Buena'),
@@ -152,7 +158,7 @@ class _MapLegend extends StatelessWidget {
             ),
           const SizedBox(height: 4),
           Text(
-            '$coberturaSectores de 22 comunas con sensores activos',
+            '$coberturaSectores de $totalSectores comunas con sensores activos',
             style: const TextStyle(
               fontSize: 11,
               color: AppColors.textMuted,

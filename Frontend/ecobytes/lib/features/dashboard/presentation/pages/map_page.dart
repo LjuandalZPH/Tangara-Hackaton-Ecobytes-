@@ -168,9 +168,7 @@ class _BottomMetricsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final conDatos = sectores
-        .where((s) => !s.sinDatosRecientes && s.pm25Promedio != null)
-        .toList();
+    final conDatos = sectores.where((s) => s.tieneDatos).toList();
 
     Sector? mejor;
     Sector? peor;
