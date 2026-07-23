@@ -68,7 +68,32 @@ CLICKHOUSE_SECURE=True
 - [x] **Validado contra datos reales (2026-07-23):** corrido con Docker (`docker compose up`, credenciales reales) contra ClickHouse. `GET /sensors/latest` devuelve 62 sensores con coordenadas dentro del bounding box de Cali — confirma que `geo` sí es geohash estándar. `GET /sensors/{id}/history` y `WS /ws/live` (ping/pong) también verificados con datos reales.
 - [x] **Hallazgo de la validación — desborde de `hours` en `/history` (2026-07-23):** pedir `hours=999999` devolvía 404 en vez de datos. Causa: ClickHouse guarda `DateTime` como `UInt32` (rango 1970–2106); `now() - INTERVAL {hours} HOUR` con un valor muy grande cruza por debajo de 1970-01-01 y da la vuelta (wraparound) a una fecha futura, así que la query no encuentra nada. Corregido acotando `hours` a `(0, 490_000]` (`Query(gt=0, le=MAX_HISTORY_HOURS)` en `routers/sensors.py`) — devuelve 422 en vez de fallar en silencio. Verificado el borde exacto (`hours=490000` → 200, `hours=999999` → 422, `hours=-5` → 422).
 
-**Nota — alcance de esta migración:** fue deliberadamente un *swap* de la fuente de datos, no la construcción de los 4 endpoints documentados. `routers/sensors.py` sigue exponiendo `/sensors/latest`, `/sensors/{id}/history` y `/ws/live` (mismo contrato de antes), ahora contra ClickHouse. La sectorización (`services/geo.py`, mapeo sensor→sector, `GET /sectors`), el perfil de riesgo histórico (`GET /risk/{sector}`) y el contenido educativo (`GET /education`) quedan como trabajo de la sección 2.4, sin empezar todavía — dependen además de resolver 2.3 (catálogo sensor→sector) primero.
+**Nota — alcance de aquella migración (superado el 2026-07-23):** el trabajo del 2026-07-22 fue deliberadamente un *swap* de la fuente de datos, dejando `routers/sensors.py` con su contrato anterior. La rama `feature/backend-clickhouse` completó después la fase que quedaba pendiente (sectorización + los 4 endpoints, §2.4) y **retiró `routers/sensors.py`, el WebSocket `/ws/live` y `pygeohash`**:
+
+- `/sensors/*` y `/ws/live` no aparecen en ningún documento de arquitectura. `01-Arquitectura.md` y `04-Arquitectura-Frontend.md` especifican polling REST cada 30-60 s (`Timer.periodic`), no una conexión persistente.
+- `pygeohash` sobra: la decodificación se resuelve con `geohashDecode()` dentro de la propia query de ClickHouse (server-side), sin dependencia extra ni `try/except` en Python.
+
+**Lo que sí se conserva de esa validación**, porque sigue siendo cierto y útil:
+
+- La columna `geo` **es geohash estándar** — confirmado empíricamente con 62 sensores dentro del bounding box de Cali. Esto es justamente lo que habilita usar `geohashDecode()` en SQL con confianza.
+- **Cuidado con `DateTime` como `UInt32` en ClickHouse** (rango 1970–2106): `now() - INTERVAL {n} HOUR` con un `n` grande cruza por debajo de 1970 y da la vuelta, devolviendo vacío en vez de fallar. Hoy no aplica —`risk.py` usa `INTERVAL 1 YEAR` fijo, sin parámetro de usuario— pero si en el futuro algún endpoint acepta un rango de fechas por query param, hay que acotarlo (el valor usado entonces fue `490_000` horas).
+
+- [x] **Verificado:** `clickhouse-connect` **sí** expone un cliente async nativo (`get_async_client()`, extra `[async]`, sobre `aiohttp`), así que **no** hace falta `run_in_threadpool`. El cliente es un singleton perezoso que se cierra en el `shutdown` de FastAPI.
+- [x] **`services/clickhouse_client.py` en su forma final:** expone `ultimo_promedio_por_sensor()`, `posiciones_sensores()`, `promedio_mensual()` y `dias_sobre_limite()`. Es además el único punto donde se aplica la calibración de PM2.5 (ver §2.5).
+- [x] **`.env` funcional verificado (2026-07-23):** el backend consulta ClickHouse y devuelve datos reales. Queda por confirmar si el usuario es propio de EcoBytes o el `usuario_analista` genérico.
+
+### 2.5 ✅ Decisión tomada: se aplica calibración de PM2.5 por humedad
+
+**Decisión (2026-07-23): se calibra, y no se expone PM2.5 crudo en ningún endpoint.**
+
+- `services/calibration.py` se conserva (portado desde la línea de trabajo de `develop`, renombrado a `calibrar_pm25` por consistencia con el español del resto del backend). `K_FACTOR = 0.24`, fórmula de Dillo et al.
+- Se descartan `calibrate_batch` (dependía de `numpy` para la ingesta CSV por lotes, que ya no existe) y `get_alert_level` (redundante: `sectors.py` ya clasifica verde/amarillo/rojo con los umbrales OMS de `03-Arquitectura-Backend.md` §3; no se reemplaza ese esquema por uno de 6 niveles). **No se reintroduce `numpy`** — la fórmula es escalar.
+- **La calibración se aplica una sola vez, dentro de `services/clickhouse_client.py`**, no en los routers: así el crudo nunca llega a `sectors.py`/`risk.py`, que consumen `pm25_promedio` sin saber que la corrección existe.
+- `dias_sobre_limite()` **ya no puede filtrar con `HAVING` en SQL**: la corrección no es lineal, así que filtrar sobre el `avg(pm25)` crudo daría un conjunto de días distinto. Se traen los promedios diarios (~365 filas) y se cuenta en Python.
+- `hum_promedio` se conserva en la respuesta de `/sectors/{id}`: es una lectura ambiental legítima por sí misma, no un "crudo de PM2.5".
+
+- [ ] ⚠️ **Riesgo abierto — doble calibración.** Nadie ha verificado si el pipeline de Tángara ya aplica esta misma corrección al construir la capa Plata. Si lo hiciera, estaríamos corrigiendo dos veces y los valores saldrían artificialmente bajos. Anotado también como aviso en el propio `services/calibration.py`.
+- [ ] Validar `K_FACTOR` con el equipo de Electrónica (T-01.1) — hoy es un valor empírico sin confirmar.
 
 ### 2.3 Catálogo sensor→sector: confirmado que no existe listo, hay que construirlo
 
@@ -93,10 +118,19 @@ Se buscó activamente antes de escribir este plan: el repo del pipeline no lo ti
 
 ### 2.4 Resto del plan de backend
 
-- [ ] Implementar `services/geo.py` con `SectorIndex` (cargando `Backend/data/sectores.geojson`, ya en el repo, + `shapely`) para resolver el `sector_id` de cada sensor, según el mapeo de 2.3.
-- [ ] Reformar los endpoints para cumplir el contrato documentado: `GET /sectors`, `GET /sectors/{id}`, `GET /risk/{sector}`, `GET /education`.
-- [ ] Agregar caché en memoria con TTL corto para `/sectors` (`services/cache.py`, según `03-Arquitectura-Backend.md` §1.4) — más importante todavía si cada request agrega sobre Plata en vez de leer de un Gold pre-agregado.
-- [ ] Actualizar `03-Arquitectura-Backend.md` §4 y §6 con los nombres reales de tabla/columna y variables de entorno una vez implementado, para que el documento deje de tener el esqueleto hipotético.
+- [x] Implementar `services/geo.py` con `SectorIndex` (`Backend/data/sectores.geojson` + `shapely`). Normaliza el esquema de IDESC (`comcodigo`/`comnombre`) al contrato público (`comuna-2` / `Comuna 2`).
+- [x] Reformar los endpoints para cumplir el contrato documentado: `GET /sectors`, `GET /sectors/{id}`, `GET /risk/{sector}`, `GET /education`. Son los únicos que existen, más `/health`.
+- [x] Agregar caché en memoria con TTL corto para `/sectors` (`services/cache.py`, `cachetools.TTLCache`): 30 s para `/sectors` y ~1 h para el mapeo sensor→sector.
+- [x] Actualizar `03-Arquitectura-Backend.md` §4 y §6 con los nombres reales. §6 ya tenía las variables correctas; §4 y §5 se reemplazaron por la implementación real (cliente async nativo, `geohashDecode()` en la query, normalización de `comcodigo`).
+
+**Verificación end-to-end (2026-07-23).** El backend se levantó contra el ClickHouse real y respondió:
+
+- `GET /sectors` → 22 comunas; **7 con datos recientes** (comunas 2, 4, 8, 10, 17, 18, 22, todas en `verde`, PM2.5 entre 3.2 y 12.6 µg/m³) y 15 en `gris` por no tener ningún sensor dentro del polígono.
+- `GET /sectors/comuna-17` → `pm25 4.35`, `co2 162.07`, `hum 81.33`, `estado verde`.
+- `GET /risk/comuna-17` → `promedio_anual 7.98`, peor mes `2026-06` (13.25), mejor mes `2025-07` (3.24), `16` días sobre el límite OMS, `historico_suficiente: true`.
+- `GET /education` → 200. `GET /sectors/comuna-99` → 404. Swagger en `/docs` → 200 (DoD §8).
+
+Esto confirma que la cadena completa funciona: geohash de `tangara_plata` → `geohashDecode()` → point-in-polygon con `shapely` → agregación por comuna. **Nota:** que 15 de 22 comunas queden en `gris` no es un bug — la red Tángara simplemente no tiene sensores en todas las comunas; el frontend debe representar ese estado explícitamente.
 
 ---
 
@@ -121,11 +155,12 @@ El orden importa: varios pasos del backlog original (`T-00.4`, eliminar landing)
 
 ## 4. Integración backend↔frontend
 
-Bloqueado hasta que la sección 2 entregue los endpoints `/sectors`, `/sectors/{id}`, `/risk/{sector}` reales:
+**Desbloqueado.** La sección 2 ya entregó `/sectors`, `/sectors/{id}`, `/risk/{sector}` y `/education` funcionando contra datos reales. Esta es ahora la siguiente tarea del proyecto:
 
 - [ ] Reemplazar `MockSensorRepository` por un cliente HTTP real contra el backend (dentro de `SensorBloc` o el repositorio que se decida en el paso 5 de la sección 3).
-- [ ] Confirmar CORS del backend contra el dominio de desarrollo del frontend (`T-00.7` del backlog).
+- [ ] Confirmar CORS del backend contra el dominio de desarrollo del frontend (`T-00.7` del backlog). El default de `CORS_ORIGINS` es **vacío a propósito** (fail-closed, DoD §8): hay que declarar el origen de Flutter web en `.env` o el navegador bloqueará las llamadas.
 - [ ] Verificar el polling de 30-60s contra el backend real (hoy no hay polling real porque no hay llamada real).
+- [ ] Modelar en el frontend el estado `gris` / `sin_datos_recientes`: 15 de las 22 comunas no tienen sensores, así que no es un caso raro sino el caso mayoritario.
 
 ---
 

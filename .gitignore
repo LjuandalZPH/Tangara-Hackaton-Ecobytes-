@@ -21,10 +21,14 @@ build/
 *.csv
 *.csv.gz
 
+# Grafo de conocimiento generado por graphify (~2 MB, regenerable con /graphify)
+graphify-out/
+
 # IDEs
 .idea/
 .vscode/
 *.swp
 
-# macOS
+# macOS / Windows
 .DS_Store
+Thumbs.db

@@ -2,8 +2,8 @@ services:
 
   # ─────────────────────────────────────────
   # BACKEND — FastAPI
-  # Sin base de datos propia: lee de ClickHouse (capa Plata del
-  # pipeline Tángara), configurado vía CLICKHOUSE_* en backend/.env
+  # Sin base de datos propia: lee directamente de ClickHouse
+  # (tangara_plata), ver Backend/.env para las credenciales.
   # ─────────────────────────────────────────
   api:
     build:

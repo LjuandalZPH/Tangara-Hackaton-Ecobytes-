@@ -1,55 +1,170 @@
 """
-Cliente ClickHouse — capa Plata del pipeline Tángara.
+Cliente async de ClickHouse.
 
-El backend no tiene base de datos propia: toda lectura de sensores viene
-de tangara_plata.plata_tangara_sensores (solo lectura). El cliente async
-se crea una vez al arrancar la app (`connect()`) y se reutiliza en cada
-request vía la dependencia `get_client()`.
+Todas las queries apuntan exclusivamente a `tangara_plata.plata_tangara_sensores`
+(el schema real disponible en este entorno; la arquitectura original —
+ver 03-Arquitectura-Backend.md— asume `tangara_gold`, una capa ya
+agregada que no existe todavía). El backend es de solo lectura: nunca
+escribe en ClickHouse, la ingesta es responsabilidad del pipeline de
+Tángara, fuera de este repositorio.
+
+Este módulo es también el único lugar donde se aplica la calibración de
+PM2.5 por humedad (`services/calibration.py`): el valor crudo nunca sale
+de aquí hacia los routers, así que `sectors.py` y `risk.py` consumen
+siempre `pm25_promedio` ya corregido, sin saber que la corrección existe.
 """
 
-from clickhouse_connect import get_async_client
+import clickhouse_connect
 from clickhouse_connect.driver.asyncclient import AsyncClient
-from pydantic_settings import BaseSettings
 
+from config import settings
+from services.calibration import calibrar_pm25
 
-class Settings(BaseSettings):
-    CLICKHOUSE_HOST: str
-    CLICKHOUSE_PORT: int = 443
-    CLICKHOUSE_USER: str
-    CLICKHOUSE_PASSWORD: str
-    CLICKHOUSE_DATABASE: str = "tangara_plata"
-    CLICKHOUSE_SECURE: bool = True
-
-    class Config:
-        env_file = ".env"
-
-
-settings = Settings()
+TABLA = "plata_tangara_sensores"
 
 _client: AsyncClient | None = None
 
 
-async def connect() -> None:
-    """Crea el cliente compartido. Se llama una vez en el startup de FastAPI."""
+async def get_client() -> AsyncClient:
+    """Devuelve un cliente async de ClickHouse, creándolo (una sola vez) si hace falta."""
     global _client
-    _client = await get_async_client(
-        host=settings.CLICKHOUSE_HOST,
-        port=settings.CLICKHOUSE_PORT,
-        username=settings.CLICKHOUSE_USER,
-        password=settings.CLICKHOUSE_PASSWORD,
-        database=settings.CLICKHOUSE_DATABASE,
-        secure=settings.CLICKHOUSE_SECURE,
-    )
+    if _client is None:
+        _client = await clickhouse_connect.get_async_client(
+            host=settings.clickhouse_host,
+            port=settings.clickhouse_port,
+            username=settings.clickhouse_user,
+            password=settings.clickhouse_password,
+            database=settings.clickhouse_database,
+            secure=settings.clickhouse_secure,
+        )
+    return _client
 
 
-async def disconnect() -> None:
-    """Cierra el cliente compartido. Se llama una vez en el shutdown de FastAPI."""
+async def cerrar_cliente() -> None:
+    """Cierra la conexión del cliente async, si existe. Se llama en el shutdown de FastAPI."""
     global _client
     if _client is not None:
         await _client.close()
         _client = None
 
 
-def get_client() -> AsyncClient:
-    """Dependencia de FastAPI: devuelve el cliente creado en el startup."""
-    return _client
+async def ultimo_promedio_por_sensor() -> list[dict]:
+    """
+    Último promedio (última hora) de pm25/co2/hum por sensor, junto con
+    la última lectura y sus coordenadas (decodificadas del geohash).
+    """
+    client = await get_client()
+    query = f"""
+        SELECT
+            name,
+            avg(pm25) AS pm25_promedio,
+            avg(co2) AS co2_promedio,
+            avg(hum) AS hum_promedio,
+            max(time) AS ultima_lectura,
+            geohashDecode(argMax(geo, time)) AS coords
+        FROM {settings.clickhouse_database}.{TABLA}
+        WHERE time >= now() - INTERVAL 1 HOUR
+        GROUP BY name
+    """
+    filas = _rows_to_dicts(await client.query(query))
+
+    # Calibración por humedad: la misma query ya trae hum_promedio.
+    # hum_promedio se conserva en la respuesta porque es una lectura
+    # ambiental legítima por sí misma, no un "crudo de PM2.5".
+    for fila in filas:
+        fila["pm25_promedio"] = calibrar_pm25(fila["pm25_promedio"], fila["hum_promedio"])
+
+    return filas
+
+
+async def posiciones_sensores() -> list[dict]:
+    """
+    Última posición conocida (lat/lon decodificados del geohash) de cada
+    sensor, usada para construir el mapeo sensor -> sector una sola vez.
+
+    `coords` llega como {"longitude": ..., "latitude": ...} (así devuelve
+    clickhouse-connect el tipo Tuple con nombres que produce geohashDecode()).
+    """
+    client = await get_client()
+    query = f"""
+        SELECT
+            name,
+            geohashDecode(argMax(geo, time)) AS coords
+        FROM {settings.clickhouse_database}.{TABLA}
+        GROUP BY name
+    """
+    result = await client.query(query)
+    return _rows_to_dicts(result)
+
+
+async def promedio_mensual(sensores: list[str]) -> list[dict]:
+    """
+    Promedio de PM2.5 por mes (último año) para un conjunto de sensores,
+    ya calibrado por humedad.
+
+    Se pide `avg(hum)` junto al PM2.5 solo para poder calibrar; la humedad
+    auxiliar se descarta del resultado porque `risk.py` no la usa.
+    """
+    if not sensores:
+        return []
+    client = await get_client()
+    query = f"""
+        SELECT
+            toStartOfMonth(time) AS mes,
+            avg(pm25) AS pm25_promedio,
+            avg(hum) AS hum_promedio
+        FROM {settings.clickhouse_database}.{TABLA}
+        WHERE name IN {{sensores:Array(String)}}
+          AND time >= now() - INTERVAL 1 YEAR
+        GROUP BY mes
+        ORDER BY mes
+    """
+    filas = _rows_to_dicts(await client.query(query, parameters={"sensores": sensores}))
+
+    return [
+        {
+            "mes": fila["mes"],
+            "pm25_promedio": calibrar_pm25(fila["pm25_promedio"], fila["hum_promedio"]),
+        }
+        for fila in filas
+    ]
+
+
+async def dias_sobre_limite(sensores: list[str], umbral: float) -> int:
+    """
+    Cuenta los días (último año) en los que el promedio diario de PM2.5
+    calibrado, agregando todos los sensores del sector, superó `umbral`.
+
+    El conteo NO puede resolverse con `HAVING` en SQL: la calibración por
+    humedad no es lineal, así que filtrar sobre `avg(pm25)` crudo daría un
+    conjunto de días distinto al que resulta de calibrar primero. Se traen
+    los promedios diarios y se cuenta en Python. Son ~365 filas como máximo,
+    así que el costo es despreciable.
+    """
+    if not sensores:
+        return 0
+    client = await get_client()
+    query = f"""
+        SELECT
+            toDate(time) AS dia,
+            avg(pm25) AS pm25_promedio,
+            avg(hum) AS hum_promedio
+        FROM {settings.clickhouse_database}.{TABLA}
+        WHERE name IN {{sensores:Array(String)}}
+          AND time >= now() - INTERVAL 1 YEAR
+        GROUP BY dia
+    """
+    filas = _rows_to_dicts(await client.query(query, parameters={"sensores": sensores}))
+
+    return sum(
+        1
+        for fila in filas
+        if (pm25 := calibrar_pm25(fila["pm25_promedio"], fila["hum_promedio"])) is not None
+        and pm25 > umbral
+    )
+
+
+def _rows_to_dicts(result) -> list[dict]:
+    """Convierte el resultado de clickhouse-connect (columnas + filas) en una lista de dicts."""
+    columnas = result.column_names
+    return [dict(zip(columnas, fila)) for fila in result.result_rows]
