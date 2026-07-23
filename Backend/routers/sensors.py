@@ -7,7 +7,7 @@ capa de solo lectura alimentada por el pipeline Tángara. El backend no
 escribe ahí — no hay POST /sensors/data.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from clickhouse_connect.driver.asyncclient import AsyncClient
 import pygeohash as pgh
 import json
@@ -18,6 +18,15 @@ from services.calibration import calibrate_pm25, get_alert_level
 router = APIRouter()
 
 TABLE = "tangara_plata.plata_tangara_sensores"
+
+# ClickHouse guarda DateTime como UInt32 (rango 1970-01-01 a 2106-02-07).
+# Si `now() - INTERVAL {hours} HOUR` cruza por debajo de 1970-01-01, el valor
+# da la vuelta (wraparound) a una fecha en el futuro en vez de fallar, y la
+# query no encuentra nada. El límite real son las horas transcurridas desde
+# 1970 hasta hoy (~495 772 h en 2026-07); como 1970 es un ancla fija en el
+# pasado, ese margen solo crece con el tiempo. 490_000 h (~55.9 años) deja
+# colchón de sobra sin acercarse al punto de desborde.
+MAX_HISTORY_HOURS = 490_000
 
 
 def _decode_geo(geo: str | None) -> tuple[float | None, float | None]:
@@ -86,7 +95,7 @@ async def get_latest_readings(client: AsyncClient = Depends(get_client)):
 @router.get("/{sensor_id}/history")
 async def get_sensor_history(
     sensor_id: str,
-    hours: int = 24,          # por defecto: últimas 24 horas
+    hours: int = Query(default=24, gt=0, le=MAX_HISTORY_HOURS),  # por defecto: últimas 24 horas
     client: AsyncClient = Depends(get_client),
 ):
     """
