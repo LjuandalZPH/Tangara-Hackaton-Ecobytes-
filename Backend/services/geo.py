@@ -4,6 +4,12 @@ shapely y resuelve a qué sector pertenece un punto (lat, lon).
 
 Se carga una sola vez al iniciar FastAPI (evento `startup` en main.py)
 y vive en memoria durante toda la ejecución del servicio.
+
+El GeoJSON son las 22 comunas oficiales de Cali (fuente IDESC, WGS84;
+ver `06-Plan-de-Accion.md` §2.3), cuyas propiedades son `comcodigo`
+("01".."22") y `comnombre` ("Comuna 01".."Comuna 22"). Aquí se
+normalizan al contrato público de la API (`comuna-2`, `Comuna 2`) que
+documenta `03-Arquitectura-Backend.md` §3.
 """
 
 import json
@@ -20,15 +26,18 @@ class SectorIndex:
         with open(geojson_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        self.sectores = [
-            {
-                "id": feature["properties"]["id"],
-                "nombre": feature["properties"]["nombre"],
-                "geometry": feature["geometry"],
-                "geom": shape(feature["geometry"]),
-            }
-            for feature in data["features"]
-        ]
+        self.sectores = [self._normalizar(feature) for feature in data["features"]]
+
+    @staticmethod
+    def _normalizar(feature: dict) -> dict:
+        """Traduce una feature del GeoJSON de IDESC al sector que expone la API."""
+        codigo = int(feature["properties"]["comcodigo"])
+        return {
+            "id": f"comuna-{codigo}",
+            "nombre": f"Comuna {codigo}",
+            "geometry": feature["geometry"],
+            "geom": shape(feature["geometry"]),
+        }
 
     def resolver_sector(self, lat: float, lon: float) -> str | None:
         """Devuelve el id del sector que contiene el punto (lat, lon), o None."""

@@ -16,6 +16,11 @@ build/
 # Docker
 *.log
 
+# Datos CSV de Tángara (pueden ser pesados) — no ignora data/ completa:
+# sectores.geojson y educacion.json sí deben versionarse (ver 03-Arquitectura-Backend.md §8)
+*.csv
+*.csv.gz
+
 # IDEs
 .idea/
 .vscode/
