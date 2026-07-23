@@ -50,7 +50,7 @@ EcoBytes se diseñó con un principio simple: **velocidad de desarrollo sobre co
 - **Geometría simple** — los sectores de Cali son un conjunto fijo de polígonos; se resuelven con un archivo GeoJSON estático más una librería de geometría (`shapely`).
 - **Datos frescos por refresco periódico** — el mapa se actualiza automáticamente cada 30-60 segundos.
 - **Una sola aplicación Flutter, compilada exclusivamente a web** — accesible desde el navegador tanto en desktop como en teléfono, sin apps que instalar.
-- **ClickHouse como única fuente de datos de sensores** — se reutiliza directamente la capa Gold del pipeline Tángara (ya calibrada y agregada), sin duplicar ingesta ni almacenamiento propio.
+- **ClickHouse como única fuente de datos de sensores** — se reutiliza directamente la capa Plata del pipeline Tángara (normalizada, aunque no agregada — la agregación la resuelve el propio backend de EcoBytes), sin duplicar ingesta ni almacenamiento propio.
 
 **Stack:**
 
@@ -66,6 +66,8 @@ Documentación técnica completa:
 2. [`02-Backlog.md`](./02-Backlog.md) — épicas e historias de usuario.
 3. [`03-Arquitectura-Backend.md`](./03-Arquitectura-Backend.md) — diseño detallado del servicio FastAPI.
 4. [`04-Arquitectura-Frontend.md`](./04-Arquitectura-Frontend.md) — diseño detallado de la app Flutter.
+5. [`05-Discrepancias.md`](./05-Discrepancias.md) — diferencias entre esta arquitectura objetivo y el estado real del código.
+6. [`06-Plan-de-Accion.md`](./06-Plan-de-Accion.md) — plan concreto, con dependencias y prioridades, para cerrar esas diferencias.
 
 ---
 

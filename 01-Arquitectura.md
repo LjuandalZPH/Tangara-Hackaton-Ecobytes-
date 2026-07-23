@@ -22,7 +22,7 @@ El alcance está pensado para demostrar el valor central del producto con el men
 [ RED TÁNGARA — fuera del alcance de EcoBytes ]
   Sensores ciudadanos → InfluxDB → Pipeline ClickHouse (Bronce/Plata/Oro)
          |
-         v  Cliente ClickHouse (solo lectura, capa Gold)
+         v  Cliente ClickHouse (solo lectura, capa Plata)
 [ BACKEND — FastAPI (Python), un único servicio ]
   ├── GET /sectors                 → estado actual por sector (para colorear el mapa)
   ├── GET /sectors/{id}            → detalle de un sector específico
@@ -39,13 +39,15 @@ El alcance está pensado para demostrar el valor central del producto con el men
 
 **Principio de diseño:** un solo servicio backend sin estado propio (stateless), sin base de datos propia más allá del GeoJSON estático que vive en el repositorio. Toda la persistencia real de series de tiempo ya existe en ClickHouse — EcoBytes es una capa de consulta y presentación sobre ella, no un sistema nuevo de almacenamiento. El frontend, por su parte, es una única aplicación web: no hay builds nativos de Android ni iOS.
 
+> **Decisión de arquitectura (actualizada 2026-07-22):** la fuente de datos es la capa **Plata** de ClickHouse (`tangara_plata.plata_tangara_sensores`), no Gold. Se verificó contra el repositorio real del pipeline (`sebaxtian/clickhouse-tangara`) que `tangara_gold` está marcada como "planificada" y no existe; dado el cronograma de la hackathon, el equipo decidió no esperarla y resolver la agregación (promedios, última lectura, agrupación por sector) directamente en el backend de EcoBytes. Detalle técnico en [`06-Plan-de-Accion.md`](./06-Plan-de-Accion.md) §2 y en `03-Arquitectura-Backend.md`.
+
 ---
 
 ## 3. Decisiones clave y justificación
 
 | Decisión | Por qué esta gana en velocidad |
 | --- | --- |
-| ClickHouse (capa Gold) como única fuente de datos de sensores | Cero ingesta propia que construir; el pipeline ya calcula, calibra y agrega. |
+| ClickHouse (capa Plata) como única fuente de datos de sensores | Cero ingesta propia que construir; el pipeline ya recolecta, tipa y normaliza. La agregación (Gold) no existe todavía en el pipeline, así que EcoBytes la resuelve en sus propias queries — sigue siendo más rápido que construir una base de datos propia desde cero. |
 | GeoJSON estático + `shapely` para sectores | Sin servidor de base de datos adicional, sin migraciones geoespaciales, sin ORM espacial. Un archivo + una librería. |
 | Polling REST (`GET /sectors` cada 30-60s) | Sin servidor con estado ni lógica de reconexión que mantener. |
 | Acceso abierto, sin cuentas de usuario | Cero superficie de seguridad que mantener; ningún feature del producto la necesita. |
