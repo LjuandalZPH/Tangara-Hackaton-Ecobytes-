@@ -2,22 +2,47 @@
 Router: Sensores
 Endpoints para consultar datos de calidad del aire.
 
-Por ahora NO hay POST /sensors/data porque los datos llegan
-por CSV de Tángara (ver script de ingesta: scripts/ingest_csv.py).
-Los endpoints aquí son todos de consulta (GET).
+Los datos vienen de tangara_plata.plata_tangara_sensores (ClickHouse),
+capa de solo lectura alimentada por el pipeline Tángara. El backend no
+escribe ahí — no hay POST /sensors/data.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from clickhouse_connect.driver.asyncclient import AsyncClient
+import pygeohash as pgh
 import json
 
-from db.database import get_db
-from models.sensor import SensorReading
-from services.calibration import get_alert_level
+from services.clickhouse_client import get_client
+from services.calibration import calibrate_pm25, get_alert_level
 
 router = APIRouter()
+
+TABLE = "tangara_plata.plata_tangara_sensores"
+
+# ClickHouse guarda DateTime como UInt32 (rango 1970-01-01 a 2106-02-07).
+# Si `now() - INTERVAL {hours} HOUR` cruza por debajo de 1970-01-01, el valor
+# da la vuelta (wraparound) a una fecha en el futuro en vez de fallar, y la
+# query no encuentra nada. El límite real son las horas transcurridas desde
+# 1970 hasta hoy (~495 772 h en 2026-07); como 1970 es un ancla fija en el
+# pasado, ese margen solo crece con el tiempo. 490_000 h (~55.9 años) deja
+# colchón de sobra sin acercarse al punto de desborde.
+MAX_HISTORY_HOURS = 490_000
+
+
+def _decode_geo(geo: str | None) -> tuple[float | None, float | None]:
+    """
+    Decodifica la columna `geo` (presumiblemente geohash) a lat/lon.
+    No hay confirmación oficial del formato en el pipeline — si el valor
+    no decodifica como geohash válido, se devuelven coordenadas nulas
+    en vez de tumbar la request.
+    """
+    if not geo:
+        return None, None
+    try:
+        lat, lon = pgh.decode(geo)
+        return lat, lon
+    except Exception:
+        return None, None
 
 
 # ─────────────────────────────────────────
@@ -25,41 +50,42 @@ router = APIRouter()
 # Devuelve la lectura más reciente de cada sensor
 # ─────────────────────────────────────────
 @router.get("/latest")
-async def get_latest_readings(db: AsyncSession = Depends(get_db)):
+async def get_latest_readings(client: AsyncClient = Depends(get_client)):
     """
     Devuelve la última lectura disponible de cada sensor.
     Flutter lo usa para pintar el estado inicial del mapa.
     """
-    # Subconsulta: para cada sensor_id, obtener el timestamp más reciente
-    subquery = (
-        select(SensorReading.sensor_id, func.max(SensorReading.timestamp).label("max_ts"))
-        .group_by(SensorReading.sensor_id)
-        .subquery()
-    )
+    query = f"""
+        SELECT
+            name,
+            argMax(geo, time) AS geo,
+            argMax(tmp, time) AS tmp,
+            argMax(hum, time) AS hum,
+            argMax(pm25, time) AS pm25,
+            argMax(co2, time) AS co2,
+            max(time) AS timestamp
+        FROM {TABLE}
+        GROUP BY name
+    """
+    result = await client.query(query)
 
-    result = await db.execute(
-        select(SensorReading).join(
-            subquery,
-            (SensorReading.sensor_id == subquery.c.sensor_id) &
-            (SensorReading.timestamp == subquery.c.max_ts),
-        )
-    )
-    readings = result.scalars().all()
+    readings = []
+    for row in result.named_results():
+        pm25_calibrated = calibrate_pm25(row["pm25"], row["hum"])
+        latitude, longitude = _decode_geo(row["geo"])
+        readings.append({
+            "sensor_id": row["name"],
+            "timestamp": row["timestamp"],
+            "pm25_calibrated": pm25_calibrated,
+            "co2": row["co2"],
+            "humidity": row["hum"],
+            "temperature": row["tmp"],
+            "latitude": latitude,
+            "longitude": longitude,
+            "alert_level": get_alert_level(pm25_calibrated) if pm25_calibrated else None,
+        })
 
-    return [
-        {
-            "sensor_id": r.sensor_id,
-            "timestamp": r.timestamp,
-            "pm25_calibrated": r.pm25_calibrated,
-            "co2": r.co2,
-            "humidity": r.humidity,
-            "temperature": r.temperature,
-            "latitude": r.latitude,
-            "longitude": r.longitude,
-            "alert_level": get_alert_level(r.pm25_calibrated) if r.pm25_calibrated else None,
-        }
-        for r in readings
-    ]
+    return readings
 
 
 # ─────────────────────────────────────────
@@ -69,8 +95,8 @@ async def get_latest_readings(db: AsyncSession = Depends(get_db)):
 @router.get("/{sensor_id}/history")
 async def get_sensor_history(
     sensor_id: str,
-    hours: int = 24,          # por defecto: últimas 24 horas
-    db: AsyncSession = Depends(get_db),
+    hours: int = Query(default=24, gt=0, le=MAX_HISTORY_HOURS),  # por defecto: últimas 24 horas
+    client: AsyncClient = Depends(get_client),
 ):
     """
     Devuelve el historial de lecturas de un sensor.
@@ -80,39 +106,41 @@ async def get_sensor_history(
         sensor_id: ID del sensor (ej. "TAN-042")
         hours:     Cuántas horas hacia atrás traer (default: 24)
     """
-    since = datetime.utcnow() - timedelta(hours=hours)
+    query = f"""
+        SELECT time, pm25, hum, co2, tmp
+        FROM {TABLE}
+        WHERE name = {{sensor_id:String}}
+          AND time >= now() - INTERVAL {{hours:UInt32}} HOUR
+        ORDER BY time DESC
+        LIMIT 500
+    """
+    result = await client.query(query, parameters={"sensor_id": sensor_id, "hours": hours})
+    rows = list(result.named_results())
 
-    result = await db.execute(
-        select(SensorReading)
-        .where(SensorReading.sensor_id == sensor_id)
-        .where(SensorReading.timestamp >= since)
-        .order_by(SensorReading.timestamp.desc())
-        .limit(500)  # máximo 500 puntos para no sobrecargar Flutter
-    )
-    readings = result.scalars().all()
-
-    if not readings:
+    if not rows:
         raise HTTPException(
             status_code=404,
             detail=f"No se encontraron lecturas para el sensor '{sensor_id}' en las últimas {hours} horas.",
         )
 
+    readings = []
+    for row in rows:
+        pm25_calibrated = calibrate_pm25(row["pm25"], row["hum"])
+        readings.append({
+            "timestamp": row["time"],
+            "pm25_raw": row["pm25"],
+            "pm25_calibrated": pm25_calibrated,
+            "co2": row["co2"],
+            "humidity": row["hum"],
+            "temperature": row["tmp"],
+            "alert_level": get_alert_level(pm25_calibrated) if pm25_calibrated else None,
+        })
+
     return {
         "sensor_id": sensor_id,
         "hours_requested": hours,
         "count": len(readings),
-        "readings": [
-            {
-                "timestamp": r.timestamp,
-                "pm25_raw": r.pm25_raw,
-                "pm25_calibrated": r.pm25_calibrated,
-                "co2": r.co2,
-                "humidity": r.humidity,
-                "temperature": r.temperature,
-                "alert_level": get_alert_level(r.pm25_calibrated) if r.pm25_calibrated else None,
-            }
-            for r in readings
-        ],
+        "readings": readings,
     }
 
 
@@ -147,7 +175,7 @@ manager = ConnectionManager()
 
 
 @router.websocket("/ws/live")
-async def websocket_live(websocket: WebSocket, db: AsyncSession = Depends(get_db)):
+async def websocket_live(websocket: WebSocket):
     """
     Conexión WebSocket para datos en tiempo real.
     Flutter se conecta aquí y recibe actualizaciones cuando hay datos nuevos.

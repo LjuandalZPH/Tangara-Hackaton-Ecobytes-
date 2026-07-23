@@ -6,8 +6,8 @@ FastAPI app con CORS habilitado y routers registrados.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import sensors, auth, chatbot, game
-from db.database import create_tables
+from routers import sensors
+from services import clickhouse_client
 
 # ─────────────────────────────────────────
 # Instancia principal de la app
@@ -37,9 +37,6 @@ app.add_middleware(
 # Routers — cada módulo en su archivo
 # ─────────────────────────────────────────
 app.include_router(sensors.router,  prefix="/sensors",  tags=["Sensores"])
-app.include_router(auth.router,     prefix="/auth",     tags=["Autenticación"])
-app.include_router(chatbot.router,  prefix="/api",      tags=["Chatbot"])
-app.include_router(game.router,     prefix="/game",     tags=["Juego"])
 
 
 # ─────────────────────────────────────────
@@ -48,8 +45,14 @@ app.include_router(game.router,     prefix="/game",     tags=["Juego"])
 @app.on_event("startup")
 async def on_startup():
     """Se ejecuta cuando arranca el servidor."""
-    await create_tables()
-    print("✅ Tablas de la base de datos listas.")
+    await clickhouse_client.connect()
+    print("✅ Cliente de ClickHouse conectado.")
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Se ejecuta cuando el servidor se apaga."""
+    await clickhouse_client.disconnect()
 
 
 # ─────────────────────────────────────────
