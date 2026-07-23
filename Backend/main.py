@@ -6,7 +6,7 @@ FastAPI app con CORS habilitado y routers registrados.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import sensors, auth, chatbot, game
+from routers import sensors
 from db.database import create_tables
 
 # ─────────────────────────────────────────
@@ -37,9 +37,6 @@ app.add_middleware(
 # Routers — cada módulo en su archivo
 # ─────────────────────────────────────────
 app.include_router(sensors.router,  prefix="/sensors",  tags=["Sensores"])
-app.include_router(auth.router,     prefix="/auth",     tags=["Autenticación"])
-app.include_router(chatbot.router,  prefix="/api",      tags=["Chatbot"])
-app.include_router(game.router,     prefix="/game",     tags=["Juego"])
 
 
 # ─────────────────────────────────────────

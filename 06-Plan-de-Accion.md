@@ -24,7 +24,7 @@
 - `services/calibration.py` — la corrección de PM2.5 por humedad, lógica de dominio pura, independiente de qué base de datos quede debajo. **Importante:** hay que verificar si la fórmula ya se aplica en algún punto del pipeline Tángara antes de aplicarla otra vez (evitar doble calibración) — ver hallazgo de la sección 2.
 - `routers/sensors.py` — su lógica de negocio (última lectura, historial, WebSocket) es reutilizable como referencia, aunque hay que reescribir el acceso a datos por debajo (de SQLAlchemy/Postgres a ClickHouse).
 
-**Lo que se retira sin ambigüedad, independiente de la base de datos:** los stubs `auth.py`, `chatbot.py`, `game.py` y los modelos `User`, `GameScore` — fuera del alcance documentado, sin consumidor en el frontend (cero referencias a gamificación en todo `lib/`).
+**Lo que se retira sin ambigüedad, independiente de la base de datos:** los stubs `auth.py`, `chatbot.py`, `game.py` y los modelos `User`, `GameScore` — fuera del alcance documentado, sin consumidor en el frontend (cero referencias a gamificación en todo `lib/`). ✅ **Ejecutado (2026-07-22):** routers y modelos eliminados; `requirements.txt` sin `langchain`/`langchain-openai`/`langchain-anthropic`/`python-jose`/`passlib`; `main.py` sin sus imports/`include_router`; `.env.example` y `Settings` (`db/database.py`) sin las variables `JWT_*`/`LLM_PROVIDER`/`ANTHROPIC_API_KEY`/`OPENAI_API_KEY`.
 
 **Lo que se retira porque ya no aplica al migrar a ClickHouse:** `db/database.py`, `models/sensor.py` (el modelo SQLAlchemy de `SensorReading`), y `scripts/ingest_csv.py` (la ingesta por CSV a Postgres deja de tener sentido si los datos ya están en ClickHouse vía el pipeline InfluxDB→ClickHouse existente).
 
@@ -143,4 +143,4 @@ Bloqueado hasta que la sección 2 entregue los endpoints `/sectors`, `/sectors/{
                 └── Frontend: /riesgo nuevo, ya contra backend real (paso 10, sección 3)
 ```
 
-La limpieza del frontend (pasos 1-3 y 6-9) y la limpieza de scope del backend (auth/chatbot/game) no dependen de nada más y se pueden empezar ya, en paralelo. Conseguir las credenciales reales de ClickHouse y confirmar el catálogo sensor→sector (2.2, 2.3) son los dos bloqueantes concretos antes de poder escribir `clickhouse_client.py` de verdad.
+La limpieza del frontend (pasos 1-3 y 6-9) y la limpieza de scope del backend (auth/chatbot/game, ✅ ya ejecutada — ver sección 1) no dependen de nada más y se pueden empezar ya, en paralelo. Conseguir las credenciales reales de ClickHouse y confirmar el catálogo sensor→sector (2.2, 2.3) son los dos bloqueantes concretos antes de poder escribir `clickhouse_client.py` de verdad.

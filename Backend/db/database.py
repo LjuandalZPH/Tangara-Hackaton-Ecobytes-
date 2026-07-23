@@ -13,12 +13,6 @@ from pydantic_settings import BaseSettings
 # ─────────────────────────────────────────
 class Settings(BaseSettings):
     DATABASE_URL: str
-    JWT_SECRET_KEY: str
-    JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 1440
-    LLM_PROVIDER: str = "anthropic"
-    ANTHROPIC_API_KEY: str = ""
-    OPENAI_API_KEY: str = ""
     ENVIRONMENT: str = "development"
 
     class Config:
@@ -59,7 +53,7 @@ class Base(DeclarativeBase):
 async def create_tables():
     """Crea todas las tablas definidas en los modelos si no existen."""
     # Importar modelos aquí para que SQLAlchemy los registre en Base.metadata
-    from models import sensor, user, game  # noqa: F401
+    from models import sensor  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
