@@ -1,0 +1,6 @@
+# Grafo de conocimiento generado por graphify (~2 MB, regenerable con /graphify)
+graphify-out/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

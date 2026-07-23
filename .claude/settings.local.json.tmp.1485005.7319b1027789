@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m venv .venv)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(git merge *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(curl -s --max-time 30 http://127.0.0.1:8931/sectors)",
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(curl -s --max-time 30 http://127.0.0.1:8931/sectors/comuna-17)",
+      "Bash(curl -s --max-time 60 http://127.0.0.1:8931/risk/comuna-17)",
+      "Bash(curl -s --max-time 20 http://127.0.0.1:8931/sectors/comuna-99)",
+      "Bash(pkill -f \"uvicorn main:app --port 8931\")",
+      "Bash(curl -sf --max-time 3 http://127.0.0.1:8931/health)",
+      "Bash(ps -p 1519963 -o pid,cmd --no-headers)",
+      "Bash(git rev-list *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

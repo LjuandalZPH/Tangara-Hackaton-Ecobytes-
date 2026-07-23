@@ -61,10 +61,10 @@ CLICKHOUSE_DATABASE=tangara_plata          # no tangara_gold — ver 2.1
 CLICKHOUSE_SECURE=True
 ```
 
-- [ ] Conseguir credenciales propias para EcoBytes (el ejemplo del repo usa un "usuario_analista" genérico — confirmar si ya tienen uno asignado o hay que solicitarlo).
-- [ ] Añadir `clickhouse-connect` a `requirements.txt`, retirando `asyncpg`, `sqlalchemy[asyncio]`, `alembic`.
-- [ ] **Verificar antes de implementar:** el script de referencia usa `clickhouse_connect.get_client(...)` de forma síncrona. FastAPI es async — confirmar si la versión de `clickhouse-connect` a usar expone un cliente async nativo, o si hay que envolver las llamadas síncronas con `starlette.concurrency.run_in_threadpool` para no bloquear el event loop.
-- [ ] Implementar `services/clickhouse_client.py` reemplazando los esqueletos de `03-Arquitectura-Backend.md` §4 con nombres de tabla/columna reales (`tangara_plata.plata_tangara_sensores`, columnas `name`/`time`/`pm25`/`co2`/`hum`/`tmp`, no `tangara_gold.promedios_horarios`).
+- [x] Conseguir credenciales propias para EcoBytes — hay un `.env` funcional en el entorno de desarrollo: el backend consulta ClickHouse y devuelve datos reales (verificado 2026-07-23, ver nota de verificación al final de §2.4). Queda pendiente confirmar si el usuario es propio de EcoBytes o el "usuario_analista" genérico.
+- [x] Añadir `clickhouse-connect` a `requirements.txt`, retirando `asyncpg`, `sqlalchemy[asyncio]`, `alembic`.
+- [x] **Verificado:** `clickhouse-connect` **sí** expone un cliente async nativo (`get_async_client()`), así que **no** hace falta `run_in_threadpool`. Se usa el extra `clickhouse-connect[async]` (instala `aiohttp`). El cliente es un singleton perezoso que se cierra en el `shutdown` de FastAPI.
+- [x] Implementar `services/clickhouse_client.py` con nombres de tabla/columna reales (`tangara_plata.plata_tangara_sensores`, columnas `name`/`time`/`pm25`/`co2`/`hum`). Expone `ultimo_promedio_por_sensor()`, `posiciones_sensores()`, `promedio_mensual()` y `dias_sobre_limite()`.
 
 ### 2.3 Catálogo sensor→sector: confirmado que no existe listo, hay que construirlo
 
@@ -89,10 +89,19 @@ Se buscó activamente antes de escribir este plan: el repo del pipeline no lo ti
 
 ### 2.4 Resto del plan de backend
 
-- [ ] Implementar `services/geo.py` con `SectorIndex` (cargando `Backend/data/sectores.geojson`, ya en el repo, + `shapely`) para resolver el `sector_id` de cada sensor, según el mapeo de 2.3.
-- [ ] Reformar los endpoints para cumplir el contrato documentado: `GET /sectors`, `GET /sectors/{id}`, `GET /risk/{sector}`, `GET /education`.
-- [ ] Agregar caché en memoria con TTL corto para `/sectors` (`services/cache.py`, según `03-Arquitectura-Backend.md` §1.4) — más importante todavía si cada request agrega sobre Plata en vez de leer de un Gold pre-agregado.
-- [ ] Actualizar `03-Arquitectura-Backend.md` §4 y §6 con los nombres reales de tabla/columna y variables de entorno una vez implementado, para que el documento deje de tener el esqueleto hipotético.
+- [x] Implementar `services/geo.py` con `SectorIndex` (`Backend/data/sectores.geojson` + `shapely`). Normaliza el esquema de IDESC (`comcodigo`/`comnombre`) al contrato público (`comuna-2` / `Comuna 2`).
+- [x] Reformar los endpoints para cumplir el contrato documentado: `GET /sectors`, `GET /sectors/{id}`, `GET /risk/{sector}`, `GET /education`. Son los únicos que existen, más `/health`.
+- [x] Agregar caché en memoria con TTL corto para `/sectors` (`services/cache.py`, `cachetools.TTLCache`): 30 s para `/sectors` y ~1 h para el mapeo sensor→sector.
+- [x] Actualizar `03-Arquitectura-Backend.md` §4 y §6 con los nombres reales. §6 ya tenía las variables correctas; §4 y §5 se reemplazaron por la implementación real (cliente async nativo, `geohashDecode()` en la query, normalización de `comcodigo`).
+
+**Verificación end-to-end (2026-07-23).** El backend se levantó contra el ClickHouse real y respondió:
+
+- `GET /sectors` → 22 comunas; **7 con datos recientes** (comunas 2, 4, 8, 10, 17, 18, 22, todas en `verde`, PM2.5 entre 3.2 y 12.6 µg/m³) y 15 en `gris` por no tener ningún sensor dentro del polígono.
+- `GET /sectors/comuna-17` → `pm25 4.35`, `co2 162.07`, `hum 81.33`, `estado verde`.
+- `GET /risk/comuna-17` → `promedio_anual 7.98`, peor mes `2026-06` (13.25), mejor mes `2025-07` (3.24), `16` días sobre el límite OMS, `historico_suficiente: true`.
+- `GET /education` → 200. `GET /sectors/comuna-99` → 404. Swagger en `/docs` → 200 (DoD §8).
+
+Esto confirma que la cadena completa funciona: geohash de `tangara_plata` → `geohashDecode()` → point-in-polygon con `shapely` → agregación por comuna. **Nota:** que 15 de 22 comunas queden en `gris` no es un bug — la red Tángara simplemente no tiene sensores en todas las comunas; el frontend debe representar ese estado explícitamente.
 
 ---
 
@@ -117,11 +126,12 @@ El orden importa: varios pasos del backlog original (`T-00.4`, eliminar landing)
 
 ## 4. Integración backend↔frontend
 
-Bloqueado hasta que la sección 2 entregue los endpoints `/sectors`, `/sectors/{id}`, `/risk/{sector}` reales:
+**Desbloqueado.** La sección 2 ya entregó `/sectors`, `/sectors/{id}`, `/risk/{sector}` y `/education` funcionando contra datos reales. Esta es ahora la siguiente tarea del proyecto:
 
 - [ ] Reemplazar `MockSensorRepository` por un cliente HTTP real contra el backend (dentro de `SensorBloc` o el repositorio que se decida en el paso 5 de la sección 3).
-- [ ] Confirmar CORS del backend contra el dominio de desarrollo del frontend (`T-00.7` del backlog).
+- [ ] Confirmar CORS del backend contra el dominio de desarrollo del frontend (`T-00.7` del backlog). El default de `CORS_ORIGINS` es **vacío a propósito** (fail-closed, DoD §8): hay que declarar el origen de Flutter web en `.env` o el navegador bloqueará las llamadas.
 - [ ] Verificar el polling de 30-60s contra el backend real (hoy no hay polling real porque no hay llamada real).
+- [ ] Modelar en el frontend el estado `gris` / `sin_datos_recientes`: 15 de las 22 comunas no tienen sensores, así que no es un caso raro sino el caso mayoritario.
 
 ---
 

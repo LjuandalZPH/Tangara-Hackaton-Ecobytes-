@@ -35,7 +35,13 @@ app = FastAPI(
 # ─────────────────────────────────────────
 # CORS — permite que Flutter web se conecte
 # ─────────────────────────────────────────
-# Dominio(s) real(es) configurados vía CORS_ORIGINS en .env (ver .env.example)
+# Dominio(s) real(es) configurados vía CORS_ORIGINS en .env (ver .env.example).
+# La lista vacía es intencional como default (03-Arquitectura-Backend.md §8):
+# sin CORS_ORIGINS no se permite ningún origen, en vez de permitirlos todos.
+if not settings.cors_origins_list:
+    print("AVISO: CORS_ORIGINS está vacío — el navegador bloqueará al frontend. "
+          "Define CORS_ORIGINS en .env con el dominio de Flutter web (ver .env.example).")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,

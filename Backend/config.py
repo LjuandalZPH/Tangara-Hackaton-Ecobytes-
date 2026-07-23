@@ -12,13 +12,18 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     clickhouse_host: str = "localhost"
-    clickhouse_port: int = 8443
+    clickhouse_port: int = 443
     clickhouse_user: str = "default"
     clickhouse_password: str = ""
     clickhouse_database: str = "tangara_plata"
     clickhouse_secure: bool = True
 
-    cors_origins: str = "*"
+    # Vacío por defecto (fail-closed): el Definition of Done de
+    # 03-Arquitectura-Backend.md §8 exige CORS configurado explícitamente
+    # para el dominio del frontend. Un default de "*" combinado con
+    # allow_credentials=True hace que Starlette refleje cualquier Origin,
+    # es decir, acceso con credenciales desde cualquier sitio.
+    cors_origins: str = ""
 
     environment: str = "development"
 

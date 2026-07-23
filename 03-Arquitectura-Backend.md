@@ -22,6 +22,7 @@
 ```scheme
 backend/
 ├── main.py                     # App FastAPI, CORS, carga de GeoJSON al startup
+├── config.py                   # Settings (.env) + constantes de dominio (umbrales OMS, TTLs)
 ├── routers/
 │   ├── sectors.py              # GET /sectors, GET /sectors/{id}
 │   ├── risk.py                 # GET /risk/{sector}
@@ -97,33 +98,46 @@ Devuelve el contenido estático de `data/educacion.json`. No requiere lógica ad
 
 Todas las queries del backend apuntan **exclusivamente a `tangara_plata.plata_tangara_sensores`** (nunca a Bronce directamente). A diferencia del plan original, esta tabla **no** viene pre-agregada — cada fila es una lectura individual de un sensor (columnas: `time` `DateTime64`, `name` `String`, `geo` `String`, `tmp`/`hum`/`pm25`/`co2` `Nullable(Float32)`). El backend es responsable de agregar (`GROUP BY`, `avg()`, `max()`) en cada query, apoyándose en la capa de caché (`services/cache.py`) para no repetir el trabajo en cada refresco del polling — incluso sobre el histórico de 62M+ filas, ClickHouse resuelve este tipo de agregación analítica con rapidez.
 
+**Cliente async nativo (verificado).** La duda que planteaba este documento —si había que envolver el cliente con `starlette.concurrency.run_in_threadpool`— quedó resuelta: `clickhouse-connect` expone `get_async_client()`, así que no hace falta el threadpool. El cliente se crea una sola vez (singleton perezoso) y se cierra en el `shutdown` de FastAPI.
+
 ```python
-# services/clickhouse_client.py (esqueleto)
-# Cliente: clickhouse_connect.get_client(host=..., port=..., username=..., password=..., database="tangara_plata", secure=True)
-# Nota: el cliente de clickhouse-connect es síncrono — envolver con starlette.concurrency.run_in_threadpool
-# desde los endpoints async, a menos que la versión instalada exponga un cliente async nativo (verificar).
+# services/clickhouse_client.py (implementación real)
+
+_client = await clickhouse_connect.get_async_client(
+    host=..., port=..., username=..., password=..., database="tangara_plata", secure=True
+)
 
 async def ultimo_promedio_por_sensor() -> list[dict]:
+    # geohashDecode() resuelve la posición del sensor en la propia query:
+    # la columna `geo` es un geohash, y así se evita una dependencia extra
+    # de decodificación en Python. Devuelve Tuple(longitude, latitude).
     query = """
-        SELECT name, avg(pm25) AS pm25_promedio, max(time) AS ultima_lectura
+        SELECT
+            name,
+            avg(pm25) AS pm25_promedio,
+            avg(co2)  AS co2_promedio,
+            avg(hum)  AS hum_promedio,
+            max(time) AS ultima_lectura,
+            geohashDecode(argMax(geo, time)) AS coords
         FROM tangara_plata.plata_tangara_sensores
         WHERE time >= now() - INTERVAL 1 HOUR
         GROUP BY name
     """
-    return await client.query(query)
+    return _rows_to_dicts(await client.query(query))
 
-async def perfil_historico(sector_sensores: list[str]) -> dict:
+async def promedio_mensual(sensores: list[str]) -> list[dict]:
     query = """
-        SELECT
-            toStartOfMonth(time) AS mes,
-            avg(pm25) AS promedio
+        SELECT toStartOfMonth(time) AS mes, avg(pm25) AS pm25_promedio
         FROM tangara_plata.plata_tangara_sensores
         WHERE name IN {sensores:Array(String)}
+          AND time >= now() - INTERVAL 1 YEAR
         GROUP BY mes
-        ORDER BY promedio
+        ORDER BY mes
     """
-    return await client.query(query, parameters={"sensores": sector_sensores})
+    return _rows_to_dicts(await client.query(query, parameters={"sensores": sensores}))
 ```
+
+Además de estas dos, el módulo expone `posiciones_sensores()` (última posición de cada sensor, para construir el mapeo sensor→sector una sola vez) y `dias_sobre_limite(sensores, umbral)` (días del último año cuyo promedio diario superó el umbral OMS, para `/risk/{sector}`).
 
 ---
 
