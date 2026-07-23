@@ -137,13 +137,22 @@ import json
 
 class SectorIndex:
     def __init__(self, geojson_path: str):
-        with open(geojson_path) as f:
+        with open(geojson_path, encoding="utf-8") as f:
             data = json.load(f)
-        self.sectores = [
-            {"id": f["properties"]["id"], "nombre": f["properties"]["nombre"],
-             "geom": shape(f["geometry"])}
-            for f in data["features"]
-        ]
+        self.sectores = [self._normalizar(f) for f in data["features"]]
+
+    @staticmethod
+    def _normalizar(feature: dict) -> dict:
+        # El GeoJSON oficial de IDESC trae `comcodigo` ("01".."22") y
+        # `comnombre` ("Comuna 01"), no `id`/`nombre`: se traduce aquí al
+        # contrato público de la API definido en §3.
+        codigo = int(feature["properties"]["comcodigo"])
+        return {
+            "id": f"comuna-{codigo}",
+            "nombre": f"Comuna {codigo}",
+            "geometry": feature["geometry"],
+            "geom": shape(feature["geometry"]),
+        }
 
     def resolver_sector(self, lat: float, lon: float) -> str | None:
         punto = Point(lon, lat)
@@ -153,7 +162,7 @@ class SectorIndex:
         return None
 ```
 
-Se carga **una sola vez** al iniciar FastAPI (`main.py`, evento `startup`) y vive en memoria durante toda la ejecución del servicio. Con el número de sectores de Cali (decenas, no miles), esto es instantáneo.
+Se carga **una sola vez** al iniciar FastAPI (`main.py`, evento `startup`) y vive en memoria durante toda la ejecución del servicio. Con el número de sectores de Cali (22 comunas, no miles), esto es instantáneo.
 
 ---
 

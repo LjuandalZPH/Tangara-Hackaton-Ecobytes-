@@ -16,19 +16,19 @@ Los archivos `01-Arquitectura.md`, `02-Backlog.md`, `03-Arquitectura-Backend.md`
 
 | Objetivo documentado (lo que debe existir) | Código actual (deuda pendiente de corregir) |
 | --- | --- |
-| Backend sin estado propio, ClickHouse (capa Plata) como única fuente de datos, GeoJSON + `shapely` para sectores | PostgreSQL + PostGIS vía SQLAlchemy async, sin ClickHouse todavía (el GeoJSON de sectores ya está en el repo, ver nota abajo) |
-| Solo 4 endpoints: `/sectors`, `/sectors/{id}`, `/risk/{sector}`, `/education` | Routers actuales: `sensors` (`/latest`, `/{sensor_id}/history`, WebSocket `/ws/live`), `auth`, `chatbot`, `game` — todos stubs salvo `sensors`; `chatbot` y `game` son scope fuera de lo documentado |
-| Sin autenticación, acceso abierto | Modelo `User` + JWT planeado (`routers/auth.py` es stub, "Sprint 3") — también fuera de lo documentado |
+| Backend sin estado propio, ClickHouse (capa Plata) como única fuente de datos, GeoJSON + `shapely` para sectores | ✅ **Cerrado.** El backend ya no tiene BD propia: `services/clickhouse_client.py` consulta la capa Plata y `services/geo.py` resuelve sectores con `shapely` sobre `data/sectores.geojson` |
+| Solo 4 endpoints: `/sectors`, `/sectors/{id}`, `/risk/{sector}`, `/education` | ✅ **Cerrado.** Son exactamente los routers que existen (`sectors`, `risk`, `education`); `sensors`, `auth`, `chatbot` y `game` fueron eliminados |
+| Sin autenticación, acceso abierto | ✅ **Cerrado.** No hay modelo `User` ni JWT: se eliminaron junto con la capa Postgres |
 | Frontend: `Provider`, sin carpetas nativas, sin landing ni chatbot, rutas solo `/map`, `/risk`, `/learn` | Frontend usa `flutter_bloc`, mantiene carpetas nativas (`android/`, `ios/`, `macos/`, `linux/`, `windows/`), y conserva `features/landing/` y `features/chatbot/`; rutas reales: `/` (landing), `/mapa`, `/aprende`, `/chatbot` |
 
 El backlog (`02-Backlog.md`, épica EPI-01) ya define el trabajo de limpieza necesario para llegar del estado actual al objetivo (eliminar plataformas nativas, quitar landing/chatbot, migrar a Provider, etc.), y lo marca como **bloqueante**: EPI-02 (capa de datos) depende explícitamente de que EPI-01 esté cerrado primero. Si te piden avanzar en el proyecto sin más contexto, prioriza cerrar esas brechas en el orden del backlog (IDs `T-00.x` en adelante) antes de construir features nuevas sobre la base desalineada. Solo trabajes deliberadamente "con lo que hay" si el usuario lo pide explícitamente para una tarea puntual.
 
-**Estado de la migración a ClickHouse (decidida, en curso):** el equipo confirmó acceso real a ClickHouse (pipeline Tángara) y decidió migrar el backend de Postgres a ClickHouse en vez de quedarse en Postgres. La fuente definitiva es la capa **Plata** (`tangara_plata.plata_tangara_sensores`), no Gold — `tangara_gold` está marcada como "planificada" en el pipeline y, con la hackathon cerca del cierre, el equipo decidió no esperarla: `01-Arquitectura.md` y `03-Arquitectura-Backend.md` ya se actualizaron para reflejar esto como la arquitectura vigente, no como una nota temporal. Ver `06-Plan-de-Accion.md` §1-2 para el plan técnico completo (librería `clickhouse-connect`, variables de entorno reales, esquema de columnas). `Backend/data/sectores.geojson` ya fue agregado al repo (22 comunas de Cali, fuente oficial IDESC) como parte de este trabajo, aunque el código que lo consume (`services/geo.py`) todavía no existe. Antes de asumir que el backend sigue en Postgres indefinidamente, revisa `06-Plan-de-Accion.md` por si ya avanzó la migración.
+**Estado de la migración a ClickHouse: ya ejecutada.** El backend dejó de usar Postgres — se eliminaron `db/`, `models/`, los routers `sensors`/`auth`/`chatbot`/`game`, `scripts/ingest_csv.py` y `services/calibration.py`. La fuente de datos es la capa **Plata** (`tangara_plata.plata_tangara_sensores`), no Gold: `tangara_gold` está marcada como "planificada" en el pipeline y el equipo decidió no esperarla. Ver `06-Plan-de-Accion.md` §1-2 para el detalle técnico (librería `clickhouse-connect`, variables de entorno, esquema de columnas). Las brechas que siguen abiertas están en `05-Discrepancias.md` y son sobre todo de frontend.
 
 ## Estructura del repositorio
 
 ```
-Backend/     — FastAPI (Python), PostgreSQL/PostGIS vía SQLAlchemy async
+Backend/     — FastAPI (Python), sin BD propia: lee del ClickHouse público de Tángara
 Frontend/ecobytes/ — Flutter (Dart), app multi-plataforma (target: solo web)
 *.md (raíz) — documentación de arquitectura objetivo y backlog Scrum
 ```
@@ -38,13 +38,13 @@ Frontend/ecobytes/ — Flutter (Dart), app multi-plataforma (target: solo web)
 ### Comandos
 
 ```bash
-# Levantar todo el stack (Postgres + API) con hot-reload
+# Levantar la API con hot-reload (único servicio, no hay base de datos que levantar)
 docker compose up
 
-# Desarrollo local sin Docker (requiere Postgres accesible vía DATABASE_URL)
+# Desarrollo local sin Docker
 cd Backend
 pip install -r requirements.txt
-cp .env.example .env   # completar valores, especialmente DATABASE_URL y JWT_SECRET_KEY
+cp .env.example .env   # completar las credenciales CLICKHOUSE_* y CORS_ORIGINS
 uvicorn main:app --reload
 
 # Verificar que el servicio responde
@@ -53,23 +53,19 @@ curl http://localhost:8000/health
 # Documentación interactiva de la API (Swagger / ReDoc)
 # http://localhost:8000/docs
 # http://localhost:8000/redoc
-
-# Ingestar un CSV histórico de Tángara (correr desde Backend/, con la API levantada)
-python scripts/ingest_csv.py --file datos_tangara_2026_05.csv
 ```
 
 No hay suite de tests ni linter configurado en el backend todavía.
 
 ### Arquitectura actual
 
-- **`main.py`** — instancia FastAPI, configura CORS (`allow_origins=["*"]`, ajustar en producción), registra routers, crea tablas al arrancar vía `create_tables()`.
-- **`db/database.py`** — engine async de SQLAlchemy, `Settings` (pydantic-settings, lee `.env`), `Base` declarativo, `get_db()` como dependencia de sesión por-request. Las tablas se crean automáticamente en `startup` (no hay migraciones Alembic activas todavía pese a estar en `requirements.txt`).
-- **`models/`** — `SensorReading` (lecturas de sensores Tángara, con `pm25_raw`/`pm25_calibrated` separados), `User` (email + password hash), `GameScore` (puntajes de gamificación, FK a `User`).
-- **`routers/`** — un router por dominio, registrado en `main.py` con su propio prefix. Solo `sensors.py` tiene lógica real; `auth.py`, `chatbot.py` y `game.py` son stubs (`GET /status`) pendientes de sprints futuros — no asumas que su lógica de negocio existe.
-- **`services/calibration.py`** — corrección de PM2.5 por humedad (fórmula de Dillo et al., factor `K_FACTOR` empírico pendiente de validación por el equipo de electrónica) y clasificación de niveles de alerta según umbrales OMS. Es lógica de dominio pura, sin dependencias de FastAPI/DB — reutilizable tanto en el router de sensores como en el script de ingesta.
-- **`scripts/ingest_csv.py`** — carga por lotes de CSVs históricos de Tángara a Postgres, aplicando la misma calibración. El `COLUMN_MAP` interno está pensado para ajustarse una vez se conozcan las columnas reales del CSV de producción.
-- El endpoint `GET /sensors/latest` y el WebSocket `/sensors/ws/live` son los puntos de integración clave con el frontend para pintar el mapa; `GET /sensors/{id}/history` alimenta la vista de detalle.
-- **`data/sectores.geojson`** — GeoJSON de las 22 comunas de Cali (fuente oficial IDESC/Alcaldía de Cali, WGS84), agregado al repo como insumo para la futura sectorización. Todavía no lo consume ningún código (`services/geo.py` no existe aún) — ver `06-Plan-de-Accion.md` §2.3-2.4.
+- **`main.py`** — instancia FastAPI, configura CORS, registra los tres routers y carga el `SectorIndex` en memoria en el evento `startup`. El mapeo sensor→sector se resuelve de forma perezosa (no en el arranque), para no depender de que ClickHouse esté disponible en ese instante.
+- **`config.py`** — `Settings` (pydantic-settings, lee `.env`: credenciales `CLICKHOUSE_*`, `CORS_ORIGINS`) más las constantes de dominio: umbrales OMS de PM2.5 (verde <15, amarillo 15-35, rojo >35), TTLs de caché y el mínimo de meses de histórico para considerar confiable el perfil de riesgo.
+- **`services/clickhouse_client.py`** — único punto de acceso a datos. Cliente async contra `tangara_plata`, con las queries parametrizadas y la agregación de lecturas. No hay ORM ni BD propia.
+- **`services/geo.py`** — `SectorIndex`: carga `data/sectores.geojson` con `shapely` al arrancar y resuelve point-in-polygon (`resolver_sector(lat, lon)`). Normaliza el esquema del archivo (`comcodigo`/`comnombre`) al contrato público de la API (`comuna-2` / `Comuna 2`). También construye y cachea el mapeo `sensor_name → sector_id` a partir del geohash de cada sensor.
+- **`services/cache.py`** — cachés en memoria con TTL corto (~30 s para `/sectors`, ~1 h para el mapeo sensor→sector), para absorber el polling del frontend sin golpear ClickHouse en cada refresco.
+- **`routers/`** — `sectors.py` (`GET /sectors`, `GET /sectors/{id}`), `risk.py` (`GET /risk/{sector}`), `education.py` (`GET /education`, sirve `data/educacion.json`). No hay más endpoints que estos cuatro más `/health`.
+- **`data/sectores.geojson`** — las 22 comunas de Cali (fuente oficial IDESC/Alcaldía, WGS84). Va versionado; ver `Backend/data/README.md` para la fuente y cómo redescargarlo.
 
 ## Frontend (`Frontend/ecobytes/`)
 
@@ -99,4 +95,4 @@ flutter build web --release  # build de producción
 
 ## Contrato API backend↔frontend
 
-El backend real expone `/sensors/*` (no los endpoints `/sectors`, `/risk`, `/education` de los docs objetivo). El frontend aún no consume estos endpoints — `dashboard` usa un repositorio mock. Al conectar frontend y backend, el contrato a implementar debe decidirse mirando ambos lados del código actual, no asumiendo el contrato de `03-Arquitectura-Backend.md` como ya vigente.
+El backend ya expone exactamente los endpoints documentados: `GET /sectors`, `GET /sectors/{id}`, `GET /risk/{sector}` y `GET /education` (más `/health`). El contrato vigente es el de `03-Arquitectura-Backend.md` §3. **La brecha que queda es del lado del frontend:** `dashboard` sigue usando `mock_sensor_repository.dart` y no consume ningún endpoint real todavía — conectarlo es el siguiente paso natural, y el `id` de sector a usar en las URLs es el normalizado (`comuna-2`, no `"02"`).
