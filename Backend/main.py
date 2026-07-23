@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import sensors
-from db.database import create_tables
+from services import clickhouse_client
 
 # ─────────────────────────────────────────
 # Instancia principal de la app
@@ -45,8 +45,14 @@ app.include_router(sensors.router,  prefix="/sensors",  tags=["Sensores"])
 @app.on_event("startup")
 async def on_startup():
     """Se ejecuta cuando arranca el servidor."""
-    await create_tables()
-    print("✅ Tablas de la base de datos listas.")
+    await clickhouse_client.connect()
+    print("✅ Cliente de ClickHouse conectado.")
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Se ejecuta cuando el servidor se apaga."""
+    await clickhouse_client.disconnect()
 
 
 # ─────────────────────────────────────────

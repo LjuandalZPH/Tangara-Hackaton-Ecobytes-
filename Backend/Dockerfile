@@ -4,12 +4,6 @@ FROM python:3.12-slim
 # Directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-# Instalar dependencias del sistema necesarias para psycopg2 (driver de PostgreSQL)
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copiar e instalar dependencias de Python primero
 # (esto se cachea en Docker si requirements.txt no cambia — builds más rápidos)
 COPY requirements.txt .

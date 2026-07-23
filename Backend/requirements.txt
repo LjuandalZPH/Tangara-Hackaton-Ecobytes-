@@ -2,10 +2,11 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 
-# Base de datos
-asyncpg==0.29.0          # driver async para PostgreSQL
-sqlalchemy[asyncio]==2.0.35  # ORM — mapea tablas a clases Python
-alembic==1.13.2          # migraciones de base de datos
+# Base de datos — ClickHouse (capa Plata del pipeline Tángara, solo lectura)
+clickhouse-connect[async]==1.5.0
+
+# Geometría — decodificación de la columna `geo` (geohash) a lat/lon
+pygeohash==3.3.1
 
 # Validación de datos
 pydantic==2.9.2
@@ -13,8 +14,6 @@ pydantic-settings==2.5.2  # leer variables de entorno desde .env
 
 # Calibración científica (PM2.5)
 numpy==2.1.1
-pandas==2.2.3
-scikit-learn==1.5.2
 
 # WebSockets (incluido en fastapi, pero explícito por claridad)
 websockets==13.0.1

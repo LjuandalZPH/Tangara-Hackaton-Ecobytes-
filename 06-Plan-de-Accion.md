@@ -26,7 +26,7 @@
 
 **Lo que se retira sin ambigüedad, independiente de la base de datos:** los stubs `auth.py`, `chatbot.py`, `game.py` y los modelos `User`, `GameScore` — fuera del alcance documentado, sin consumidor en el frontend (cero referencias a gamificación en todo `lib/`). ✅ **Ejecutado (2026-07-22):** routers y modelos eliminados; `requirements.txt` sin `langchain`/`langchain-openai`/`langchain-anthropic`/`python-jose`/`passlib`; `main.py` sin sus imports/`include_router`; `.env.example` y `Settings` (`db/database.py`) sin las variables `JWT_*`/`LLM_PROVIDER`/`ANTHROPIC_API_KEY`/`OPENAI_API_KEY`.
 
-**Lo que se retira porque ya no aplica al migrar a ClickHouse:** `db/database.py`, `models/sensor.py` (el modelo SQLAlchemy de `SensorReading`), y `scripts/ingest_csv.py` (la ingesta por CSV a Postgres deja de tener sentido si los datos ya están en ClickHouse vía el pipeline InfluxDB→ClickHouse existente).
+**Lo que se retira porque ya no aplica al migrar a ClickHouse:** `db/database.py`, `models/sensor.py` (el modelo SQLAlchemy de `SensorReading`), y `scripts/ingest_csv.py` (la ingesta por CSV a Postgres deja de tener sentido si los datos ya están en ClickHouse vía el pipeline InfluxDB→ClickHouse existente). ✅ **Ejecutado (2026-07-22):** carpeta `db/` completa, `models/sensor.py` y `scripts/ingest_csv.py` eliminados; reemplazados por `services/clickhouse_client.py` (detalle técnico en §2.2).
 
 ---
 
@@ -61,10 +61,13 @@ CLICKHOUSE_DATABASE=tangara_plata          # no tangara_gold — ver 2.1
 CLICKHOUSE_SECURE=True
 ```
 
-- [ ] Conseguir credenciales propias para EcoBytes (el ejemplo del repo usa un "usuario_analista" genérico — confirmar si ya tienen uno asignado o hay que solicitarlo).
-- [ ] Añadir `clickhouse-connect` a `requirements.txt`, retirando `asyncpg`, `sqlalchemy[asyncio]`, `alembic`.
-- [ ] **Verificar antes de implementar:** el script de referencia usa `clickhouse_connect.get_client(...)` de forma síncrona. FastAPI es async — confirmar si la versión de `clickhouse-connect` a usar expone un cliente async nativo, o si hay que envolver las llamadas síncronas con `starlette.concurrency.run_in_threadpool` para no bloquear el event loop.
-- [ ] Implementar `services/clickhouse_client.py` reemplazando los esqueletos de `03-Arquitectura-Backend.md` §4 con nombres de tabla/columna reales (`tangara_plata.plata_tangara_sensores`, columnas `name`/`time`/`pm25`/`co2`/`hum`/`tmp`, no `tangara_gold.promedios_horarios`).
+- [x] **Conseguir credenciales propias para EcoBytes** — confirmado por el equipo (2026-07-22), ya disponibles.
+- [x] **Añadir `clickhouse-connect` a `requirements.txt`, retirando `asyncpg`, `sqlalchemy[asyncio]`, `alembic`** — hecho (2026-07-22), instalado como `clickhouse-connect[async]==1.5.0`. También se retiraron `pandas` y `scikit-learn` (dead weight: solo los usaba `scripts/ingest_csv.py`, ya eliminado, o no se usaban en ningún lado).
+- [x] **Verificado:** `clickhouse-connect` sí expone un cliente async nativo (`clickhouse_connect.get_async_client()`, extra `[async]`, backed por `aiohttp`) desde al menos la versión 1.5.0 — no hace falta envolver llamadas síncronas con `run_in_threadpool` como sugería el esqueleto original de `03-Arquitectura-Backend.md` §4. Verificado contra la documentación oficial de ClickHouse Connect (julio 2026).
+- [x] **Implementado `services/clickhouse_client.py`** con nombres de tabla/columna reales (`tangara_plata.plata_tangara_sensores`, columnas `name`/`time`/`pm25`/`co2`/`hum`/`tmp`), confirmados además contra `ARCHITECTURE.md` del repo real del pipeline (`sebaxtian/clickhouse-tangara`, rama `master`) el mismo día. `routers/sensors.py` fue reescrito para consultarlo (`GET /latest` con `argMax(...)` agrupado por sensor — necesario porque `ReplacingMergeTree` deduplica de forma eventual, no en cada lectura; `GET /{sensor_id}/history` con parámetros server-side `{nombre:Tipo}`). Se agregó `pygeohash` para decodificar la columna `geo` a lat/lon — el formato de esa columna **sigue sin confirmación oficial** en el repo del pipeline (no hay ejemplo de valor real ni mención de "geohash" en su documentación), así que la decodificación está envuelta en `try/except` con fallback a `None` en vez de asumir que siempre funciona.
+- [ ] **Pendiente de validar contra datos reales:** correr el backend con credenciales reales y confirmar que las coordenadas decodificadas de `geo` caen dentro del bounding box de Cali (~-76.55, 3.45). Si no, el formato de `geo` no es geohash estándar y hay que investigarlo antes de confiar en `latitude`/`longitude` para el mapa.
+
+**Nota — alcance de esta migración:** fue deliberadamente un *swap* de la fuente de datos, no la construcción de los 4 endpoints documentados. `routers/sensors.py` sigue exponiendo `/sensors/latest`, `/sensors/{id}/history` y `/ws/live` (mismo contrato de antes), ahora contra ClickHouse. La sectorización (`services/geo.py`, mapeo sensor→sector, `GET /sectors`), el perfil de riesgo histórico (`GET /risk/{sector}`) y el contenido educativo (`GET /education`) quedan como trabajo de la sección 2.4, sin empezar todavía — dependen además de resolver 2.3 (catálogo sensor→sector) primero.
 
 ### 2.3 Catálogo sensor→sector: confirmado que no existe listo, hay que construirlo
 
