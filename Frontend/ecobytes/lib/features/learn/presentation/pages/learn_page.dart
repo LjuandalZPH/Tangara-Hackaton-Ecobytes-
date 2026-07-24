@@ -6,8 +6,8 @@ import '../../../../core/utils/responsive.dart';
 
 import '../../../../shared/widgets/status_badge.dart'; //Aquí dentro viven EcoCard, StatusBadge y SectionLabel
 
-import '../../../landing/presentation/widgets/landing_footer.dart';
-import '../../../landing/presentation/widgets/landing_header.dart';
+import '../../../../shared/widgets/landing_footer.dart';
+import '../../../../shared/widgets/landing_header.dart';
 
 // --- ESTRUCTURAS DE DATOS (RECORDS) ---
 

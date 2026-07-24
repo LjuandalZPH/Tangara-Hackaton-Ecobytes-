@@ -1,6 +1,6 @@
 # 🗺️ Plan de Acción — Cierre de Brechas EcoBytes
 
-**Última actualización:** 2026-07-22
+**Última actualización:** 2026-07-23
 
 > Este documento es la versión accionable de [`05-Discrepancias.md`](./05-Discrepancias.md): convierte cada brecha ya documentada en una tarea concreta, ordenada por prioridad y dependencias. Se apoya en el backlog existente (`02-Backlog.md`, épicas EPI-01 a EPI-05) pero lo actualiza con los hallazgos encontrados durante la revisión (mapa falso, código muerto, bug de `.gitignore`, etc.) que el backlog original no conocía.
 >
@@ -136,20 +136,21 @@ Esto confirma que la cadena completa funciona: geohash de `tangara_plata` → `g
 
 ## 3. Frontend — orden recomendado (actualiza EPI-01 del backlog con los hallazgos nuevos)
 
-El orden importa: varios pasos del backlog original (`T-00.4`, eliminar landing) rompen la compilación si no se hace primero el paso de extracción del header/footer.
+1. [ ] **Resolver la duplicación de arranque**: mover `AppRoutes` + el `GoRouter` real (`appRouter`, hoy definido en `lib/app.dart`) a `core/router/app_router.dart`, dejar `lib/main.dart` (`MyApp`) como único widget raíz, y borrar `EcoBytesApp` (dead code) junto con `lib/app.dart`.
+2. [x] **`LandingHeader`, `LandingFooter`, `LandingMobileNav` movidos a `shared/widgets/`** (2026-07-23) — son el header/footer global de toda la app (los usan `landing`, `dashboard`, `learn` y `chatbot`), no exclusivos de la landing. `map_page.dart`, `learn_page.dart`, `chatbot_page.dart` y `landing_page.dart` ya importan desde la nueva ubicación. Ya no desbloquea un borrado de `landing/` (que se conserva, ver DECISIÓN abajo) — se hizo de todas formas porque es la ubicación correcta para un widget global.
+3. [ ] **Corregir `test/widget_test.dart`** para que monte el widget raíz real (el que quede tras el paso 1), no `EcoBytesApp`. Ojo: hay que desmontar el árbol al final del test (`tester.pumpWidget` con un widget vacío) para que `SectorsProvider` cancele su `Timer.periodic` de polling antes de que termine el test — si no, el test falla por "timer pendiente".
+4. [x] **Reemplazar el placeholder de `MapaPage`** — ya hecho: `MapArea` (real, con `flutter_map`) conectado a `SectorsProvider`.
+5. [x] **`SensorBloc` eliminado** — era andamiaje muerto, se borró junto con `presentation/bloc/` al migrar a `Provider`.
+6. [ ] ~~Eliminar `features/landing/` y `features/chatbot/`~~ — **Obsoleta (2026-07-23):** el Figma del equipo confirma que ambas se conservan como parte del producto. Ver DECISIÓN abajo.
+7. [ ] ~~Simplificar `app_router.dart`/`AppRoutes` a solo `/mapa`, `/aprende` y la nueva `/riesgo`~~ — **Obsoleta (2026-07-23):** las rutas reales (`/`, `/mapa`, `/aprende`, `/chatbot`) ya coinciden con el Figma, no hay nada que simplificar. No existe (ni debe existir) una ruta `/riesgo` — ver paso 9.
+8. [x] **DECISIÓN — `flutter_bloc` vs `Provider`: resuelta a favor de `Provider`** (2026-07-23, commit `a44940b`). Se migró `SectorsProvider`/`RiskProvider` a `ChangeNotifier`, se eliminó `presentation/bloc/` (código muerto) y `flutter_bloc` salió de `pubspec.yaml`. `equatable` se conserva porque sigue en uso fuera del patrón Bloc, en `dashboard/domain/models/sensor_data.dart`.
+9. [ ] **Construir `sector_detail_page.dart`** con sus tres pestañas — Resumen (indicadores actuales + evolución 24h, `GET /sectors/{id}`), Historia (perfil histórico, `GET /risk/{sector}`) y Sensores (ubicación/lista) — reachable desde el botón "Ver detalle del sector" de `map_page.dart` (hoy `onPressed: () {}`). **La capa de datos de Historia ya existe** (`domain/models/riesgo.dart` y `presentation/providers/risk_provider.dart`, commit `a44940b`, 2026-07-23: fetch bajo demanda contra `GET /risk/{sector}` con caché en memoria por sector, ya registrado en el `MultiProvider` de `main.dart`), pero ninguna pantalla la consume todavía. Corresponde a EPI-04 corregido en `02-Backlog.md` — no es una ruta `/riesgo` con selector de barrio, es parte del flujo del mapa.
+10. [ ] Confirmar con el equipo si las cifras de `StatsBar` en la landing (47 sensores, 2.4M ciudadanos, 22 comunas cubiertas) son reales/objetivo o solo ilustrativas del diseño — hoy la red Tángara cubre 7 de 22 comunas, así que "22 comunas cubiertas" es engañoso si se lee como cobertura real. Ya no es baja prioridad: la landing se conserva permanentemente, no es una sección que vaya a desaparecer.
+11. [ ] Conectar `features/learn/` a datos reales o confirmar que se queda como contenido estático (`T-05.2` del backlog — decisión ya identificada como pendiente, de baja prioridad).
 
-1. [ ] **Resolver la duplicación de arranque**: decidir entre `lib/main.dart` (`MyApp`, entrypoint real hoy) y `lib/app.dart` (`EcoBytesApp`, con su propio router, no usado) — quedarse con uno solo y borrar el otro.
-2. [ ] **Extraer `LandingHeader`, `LandingFooter`, `LandingMobileNav`** de `features/landing/presentation/widgets/` hacia `shared/widgets/` — son el header/footer global de toda la app (los usan `dashboard`, `learn` y `chatbot`), no exclusivos de la landing. Esto es lo que desbloquea poder borrar `landing/` sin romper nada.
-3. [ ] **Corregir `test/widget_test.dart`** para que monte el widget raíz real (el que quede tras el paso 1), no el que no se usa.
-4. [ ] **Reemplazar el placeholder de `MapaPage`** (el `Container` con `GridPaper` y el texto `"[ Espacio reservado para mapa interactivo ]"`) por el componente `MapArea` ya existente (real, con `flutter_map`), conectándolo a datos reales en vez de a los sectores hardcodeados que trae hoy. No hay que construir un mapa desde cero — ya existe, solo está mal enrutado.
-5. [ ] **Decidir sobre `SensorBloc`**: o se conecta de verdad (reemplazando el `TODO` por un repositorio HTTP contra el backend) y se usa en `MapaPage`/`MapArea`, o se elimina si se prefiere resolver el estado de otra forma. No dejarlo como andamiaje muerto.
-6. [ ] **Eliminar carpetas de plataformas nativas** (`android/`, `ios/`, `macos/`, `linux/`, `windows/`) — corresponde a `T-00.1`, ahora sin el bloqueo del paso 2.
-7. [ ] **Eliminar `features/landing/` y `features/chatbot/`** — corresponde a `T-00.4`, ahora seguro tras el paso 2.
-8. [ ] **Simplificar `app_router.dart`/`AppRoutes`** a solo `/mapa`, `/aprende` y la nueva `/riesgo` — corresponde a `T-00.5`.
-9. [x] **DECISIÓN — `flutter_bloc` vs `Provider`: resuelta a favor de `Provider`** (2026-07-23, commit `a44940b`). Se migró `SectorsProvider`/`RiskProvider` a `ChangeNotifier`, se eliminó `presentation/bloc/` (código muerto) y `flutter_bloc` salió de `pubspec.yaml`. `equatable` se conserva porque sigue en uso fuera del patrón Bloc, en `dashboard/domain/models/sensor_data.dart`.
-10. [ ] **Construir la UI de `features/risk/`** (`risk_page.dart`, selector de comuna, tarjeta de perfil histórico) y agregar la ruta `/riesgo` a `AppRoutes` — **la capa de datos ya existe** (`domain/models/riesgo.dart` y `presentation/providers/risk_provider.dart`, commit `a44940b`, 2026-07-23: fetch bajo demanda contra `GET /risk/{sector}` con caché en memoria por sector, ya registrado en el `MultiProvider` de `main.dart`), pero ninguna pantalla la consume todavía. Es la única sección del producto sin UI (EPI-04 del backlog).
-11. [ ] Si se conserva alguna sección de landing (fuera del alcance documentado, pero por si el equipo decide mantenerla como página de marketing separada): corregir el typo "BitAVIT Labs" → "Bit&Volt Labs" en `landing_footer.dart`, y marcar las cifras de `StatsBar` como ilustrativas o quitarlas.
-12. [ ] Conectar `features/learn/` a datos reales o confirmar que se queda como contenido estático (`T-05.2` del backlog — decisión ya identificada como pendiente, de baja prioridad).
+**DECISIÓN (2026-07-23):** el equipo decidió **conservar** las carpetas de plataforma nativa (`android/`, `ios/`, `macos/`, `linux/`, `windows/`) para poder compilar builds nativos (ej. APK de Android) a demanda, aunque web siga siendo el target de despliegue. `04-Arquitectura-Frontend.md` ya se actualizó para reflejar esto como objetivo — no es deuda pendiente, `T-00.1` del backlog queda obsoleta.
+
+**DECISIÓN (2026-07-23):** al revisar el [Figma del equipo](https://www.figma.com/design/DdGdcWdvPtcSdZ7mRRzXW9/EcoBytes-%E2%80%94-Landing-Page) (Landing, Dashboard Mapa, Aprende, Chatbot, Detalle de Producto), quedó claro que la documentación original describía un alcance que no coincidía con el diseño real: **landing y chatbot se conservan** (nav real: `Inicio | Mapa | Aprende | Chatbot`), y **no existe una pantalla `/riesgo` separada con selector de barrio** — el perfil histórico es la pestaña "Historia" de la página de detalle de sector a la que se llega desde el mapa (Figma "Detalle de Producto"). `04-Arquitectura-Frontend.md` y `02-Backlog.md` (EPI-04) ya se actualizaron. `T-00.4` del backlog queda obsoleta; `T-00.5` se redefinió (ya no es "simplificar rutas", ahora es la duplicación de arranque del paso 1). El chatbot mantiene su lugar en el producto, pero su implementación real (backend/LLM) queda en pausa hasta que un miembro del equipo la retome — no se toca su código ni su alcance mientras tanto.
 
 ---
 
@@ -163,7 +164,7 @@ El orden importa: varios pasos del backlog original (`T-00.4`, eliminar landing)
 - [x] Estado `gris` / `sin_datos_recientes` modelado: `EstadoSector.gris` con la etiqueta "Sin datos" en la leyenda, más una línea de cobertura real calculada de los datos.
 - [x] `MapaPage` deja de mostrar el placeholder: `MapArea` pinta los 22 polígonos con `PolygonLayer`. Se eliminaron los datos inventados que tenía (5 sectores ficticios, grilla decorativa, "AQI promedio: 32").
 
-**Queda abierto** (ver `07-Integracion-Backend-Frontend.md` §8): `GET /sectors/{id}` y `GET /risk/{sector}` no tienen UI todavía, `GET /education` sigue sin conectar, `_SidePanelSection` conserva datos falsos, y `features/landing/` sigue con `MockSensorRepository`.
+**Queda abierto** (ver `07-Integracion-Backend-Frontend.md` §8): `GET /sectors/{id}` y `GET /risk/{sector}` no tienen UI todavía (`sector_detail_page.dart`, paso 9 de la sección 3), `GET /education` sigue sin conectar, `_SidePanelSection` conserva datos falsos, y `features/landing/` sigue con `MockSensorRepository` (landing es contenido de marketing, se conserva — ver DECISIÓN de la sección 3).
 
 ---
 
@@ -178,11 +179,11 @@ El orden importa: varios pasos del backlog original (`T-00.4`, eliminar landing)
         │
         ├── Frontend: arranque + extracción header/footer (pasos 1-3, sección 3)
         ├── Frontend: mapa real conectado a MockRepository primero, backend después (pasos 4-5)
-        ├── Frontend: limpieza (pasos 6-9, sección 3) — en paralelo con lo anterior
+        ├── Frontend: limpieza (pasos 6-8, sección 3) — en paralelo con lo anterior
         │
         └── Integración real backend↔frontend (sección 4)
                 │
-                └── Frontend: /riesgo nuevo, ya contra backend real (paso 10, sección 3)
+                └── Frontend: sector_detail_page.dart (pestañas Resumen/Historia/Sensores), ya contra backend real (paso 9, sección 3)
 ```
 
-La limpieza del frontend (pasos 1-3 y 6-9) y la limpieza de scope del backend (auth/chatbot/game, ✅ ya ejecutada — ver sección 1) no dependen de nada más y se pueden empezar ya, en paralelo. Conseguir las credenciales reales de ClickHouse y confirmar el catálogo sensor→sector (2.2, 2.3) son los dos bloqueantes concretos antes de poder escribir `clickhouse_client.py` de verdad.
+La limpieza del frontend (pasos 1-3 y 6-8) y la limpieza de scope del backend (auth/chatbot/game, ✅ ya ejecutada — ver sección 1) no dependen de nada más y se pueden empezar ya, en paralelo. Conseguir las credenciales reales de ClickHouse y confirmar el catálogo sensor→sector (2.2, 2.3) son los dos bloqueantes concretos antes de poder escribir `clickhouse_client.py` de verdad.
