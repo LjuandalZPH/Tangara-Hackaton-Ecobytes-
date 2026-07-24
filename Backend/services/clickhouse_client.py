@@ -130,6 +130,41 @@ async def promedio_mensual(sensores: list[str]) -> list[dict]:
     ]
 
 
+async def promedio_horario(sensores: list[str], horas: int) -> list[dict]:
+    """
+    Promedio de PM2.5 por hora (últimas `horas`) para un conjunto de
+    sensores, ya calibrado por humedad. Alimenta el historial corto
+    ("Evolución de la calidad del aire") de `GET /sectors/{id}`.
+
+    `horas` siempre llega de una constante interna (`HORAS_HISTORIAL_SECTOR`
+    en config.py), nunca de un parámetro de request, así que se interpola
+    directamente en la query sin riesgo de inyección.
+    """
+    if not sensores:
+        return []
+    client = await get_client()
+    query = f"""
+        SELECT
+            toStartOfHour(time) AS hora,
+            avg(pm25) AS pm25_promedio,
+            avg(hum) AS hum_promedio
+        FROM {settings.clickhouse_database}.{TABLA}
+        WHERE name IN {{sensores:Array(String)}}
+          AND time >= now() - INTERVAL {horas} HOUR
+        GROUP BY hora
+        ORDER BY hora
+    """
+    filas = _rows_to_dicts(await client.query(query, parameters={"sensores": sensores}))
+
+    return [
+        {
+            "hora": fila["hora"],
+            "pm25_promedio": calibrar_pm25(fila["pm25_promedio"], fila["hum_promedio"]),
+        }
+        for fila in filas
+    ]
+
+
 async def dias_sobre_limite(sensores: list[str], umbral: float) -> int:
     """
     Cuenta los días (último año) en los que el promedio diario de PM2.5

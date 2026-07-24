@@ -70,7 +70,27 @@ Devuelve todos los sectores con su color/estado actual, para pintar el mapa.
 5. Respuesta cacheada 30 segundos (`services/cache.py`) para absorber el polling de múltiples clientes sin repetir la query a ClickHouse en cada request.
 
 ### `GET /sectors/{id}`
-Detalle de un sector: PM2.5, CO2, humedad y timestamp exactos, para la tarjeta que aparece al tocar un sector en el mapa.
+Detalle de un sector: PM2.5, CO2, humedad y timestamp exactos (última hora), más un historial horario corto — para la pantalla de detalle de sector que se abre desde el mapa (ver `04-Arquitectura-Frontend.md` §6, pestaña "Resumen").
+
+**Response:**
+```json
+{
+  "id": "comuna-2",
+  "nombre": "Comuna 2",
+  "pm25_promedio": 11.27,
+  "co2_promedio": 412.5,
+  "hum_promedio": 68.2,
+  "ultima_lectura": "2026-07-23T05:49:40",
+  "sin_datos_recientes": false,
+  "estado": "verde",
+  "historial_24h": [
+    { "hora": "2026-07-22T06:00:00", "pm25_promedio": 9.8 },
+    { "hora": "2026-07-22T07:00:00", "pm25_promedio": 10.4 }
+  ]
+}
+```
+
+`historial_24h` (actualizado 2026-07-23, `services/clickhouse_client.py:promedio_horario`) es el promedio de PM2.5 por hora de los sensores del sector en las últimas `HORAS_HISTORIAL_SECTOR` horas (24 por defecto, `config.py`), ya calibrado por humedad igual que el resto de los valores de PM2.5 — nunca el crudo. Si el sector no tiene sensores mapeados, o ninguno tuvo lecturas en la ventana, llega como lista vacía `[]` (nunca se rellena con datos inventados). No es un endpoint nuevo: es el mismo `GET /sectors/{id}` con un campo adicional, así que el contrato sigue siendo exactamente estos 4 endpoints.
 
 ### `GET /risk/{sector}`
 Perfil histórico: peor mes, mejor mes, promedio anual, días sobre límite OMS.
@@ -137,7 +157,7 @@ async def promedio_mensual(sensores: list[str]) -> list[dict]:
     return _rows_to_dicts(await client.query(query, parameters={"sensores": sensores}))
 ```
 
-Además de estas dos, el módulo expone `posiciones_sensores()` (última posición de cada sensor, para construir el mapeo sensor→sector una sola vez) y `dias_sobre_limite(sensores, umbral)` (días del último año cuyo promedio diario superó el umbral OMS, para `/risk/{sector}`).
+Además de estas dos, el módulo expone `posiciones_sensores()` (última posición de cada sensor, para construir el mapeo sensor→sector una sola vez), `dias_sobre_limite(sensores, umbral)` (días del último año cuyo promedio diario superó el umbral OMS, para `/risk/{sector}`) y `promedio_horario(sensores, horas)` (promedio de PM2.5 por hora en la ventana dada, para el `historial_24h` de `GET /sectors/{id}` — mismo patrón que `promedio_mensual` pero con `toStartOfHour(time)` en vez de `toStartOfMonth(time)`).
 
 ---
 

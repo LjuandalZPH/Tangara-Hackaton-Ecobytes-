@@ -89,8 +89,8 @@ existen. Estado de consumo desde el frontend:
 | Endpoint | Consumido por | Estado |
 | --- | --- | --- |
 | `GET /sectors` | `SectorsProvider` (polling 45 s) | ✅ Conectado |
-| `GET /sectors/{id}` | `ApiClient.getSectorDetalle()` | ⚠️ Implementado, sin UI que lo llame todavía |
-| `GET /risk/{sector}` | `RiskProvider` (bajo demanda) | ⚠️ Implementado, sin UI que lo llame todavía |
+| `GET /sectors/{id}` | `SectorDetailProvider` (bajo demanda) | ✅ Conectado (2026-07-23), pestaña "Resumen" de `sector_detail_page.dart` |
+| `GET /risk/{sector}` | `RiskProvider` (bajo demanda) | ✅ Conectado (2026-07-23), pestaña "Historia" de `sector_detail_page.dart` |
 | `GET /education` | — | ❌ Sin conectar (la página Aprende usa contenido estático propio) |
 
 ### Detalle de `GET /sectors`
@@ -167,15 +167,18 @@ lib/
 │   ├── config/api_config.dart        # baseUrl vía --dart-define
 │   ├── data/api_client.dart          # HTTP + ApiException
 │   └── utils/geo_utils.dart          # puntoEnPoligono (ray-casting)
+├── core/router/app_router.dart        # AppRoutes + GoRouter
 ├── features/
 │   ├── dashboard/
-│   │   ├── domain/models/sector.dart # Sector, SectorDetalle, EstadoSector
+│   │   ├── domain/models/sector.dart # Sector, SectorDetalle (+ historial_24h), EstadoSector
 │   │   ├── presentation/providers/sectors_provider.dart
+│   │   ├── presentation/providers/sector_detail_provider.dart
 │   │   ├── presentation/pages/map_page.dart
+│   │   ├── presentation/pages/sector_detail_page.dart  # /mapa/:sectorId — pestañas Resumen/Historia
 │   │   └── presentation/widgets/map_area.dart
 │   └── risk/
 │       ├── domain/models/riesgo.dart
-│       └── presentation/providers/risk_provider.dart
+│       └── presentation/providers/risk_provider.dart  # consumido por sector_detail_page.dart, pestaña "Historia"
 └── main.dart                         # MultiProvider + GoRouter
 ```
 
@@ -267,18 +270,17 @@ Electrónica lo valide contra un equipo de referencia (tarea `T-01.1`).
     city"), AQIs fijos (18, 108, 52) y un typo bilingüe ("sensor más contaminated").
   - `map_page.dart:359` — texto que insinúa un análisis geográfico ("zonas sur y
     centro") sin ningún cálculo detrás.
-  - `map_page.dart:372` y `386` — los botones "Preguntar al chatbot" y "Ver detalle
-    del sector" tienen `onPressed: () {}`: UI que aparenta funcionar y no hace nada.
-    El primero debería navegar a `/chatbot`; el segundo debería navegar a
-    `sector_detail_page.dart` (pendiente de construir, ver `06-Plan-de-Accion.md`
-    §3 paso 9), que a su vez usa `RiskProvider` (ya existe y está ocioso) para su
-    pestaña "Historia".
+  - ✅ `map_page.dart:372` y `386` — corregido (2026-07-23): los botones "Preguntar
+    al chatbot" y "Ver detalle del sector" ya no tienen `onPressed: () {}`. El
+    primero navega a `/chatbot`; el segundo navega a `sector_detail_page.dart`
+    con el sector que el usuario tocó en el mapa (deshabilitado si no hay
+    ninguno seleccionado). Ver `06-Plan-de-Accion.md` §3 paso 9.
 - **`dashboard_layout.dart` es código muerto** (nadie instancia `DashboardLayout`).
   `control_sidebar.dart` **no** lo es: lo usa `dashboard_preview_section.dart:10,62,78`
   en la landing, alimentado por `MockSensorRepository`. Eliminarlo exige tocar
   también esa sección.
-- **`GET /risk/{sector}` y `GET /sectors/{id}` no tienen UI todavía.** El
-  `RiskProvider` y el cliente existen y funcionan, pero nada los invoca.
+- ✅ **`GET /risk/{sector}` y `GET /sectors/{id}` ya tienen UI (2026-07-23).**
+  `sector_detail_page.dart`, ver arriba y `06-Plan-de-Accion.md` §3 paso 9.
 - **`GET /education` sin conectar.** La página Aprende sirve contenido estático
   propio en vez del `data/educacion.json` del backend.
 - ✅ **`widget_test.dart` corregido (2026-07-23).** El overflow de layout en
