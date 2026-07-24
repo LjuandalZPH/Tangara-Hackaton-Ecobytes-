@@ -1,29 +1,23 @@
+# Versiones fijadas (convención de develop) a las verificadas funcionando
+# contra el ClickHouse real el 2026-07-23.
+
 # Web framework
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
+fastapi==0.139.2
+uvicorn[standard]==0.51.0
 
-# Base de datos
-asyncpg==0.29.0          # driver async para PostgreSQL
-sqlalchemy[asyncio]==2.0.35  # ORM — mapea tablas a clases Python
-alembic==1.13.2          # migraciones de base de datos
+# Base de datos — ClickHouse (capa Plata del pipeline Tángara, solo lectura).
+# El extra "async" instala aiohttp, requerido por get_async_client().
+clickhouse-connect[async]==1.5.0
 
-# Validación de datos
-pydantic==2.9.2
-pydantic-settings==2.5.2  # leer variables de entorno desde .env
+# Geometría — point-in-polygon sobre sectores.geojson.
+# No se usa pygeohash: la columna `geo` se decodifica con geohashDecode()
+# en la propia query de ClickHouse (ver 03-Arquitectura-Backend.md §4).
+shapely==2.1.2
 
-# Autenticación JWT
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+# Cache TTL en memoria (services/cache.py)
+cachetools==7.1.5
 
-# Calibración científica (PM2.5)
-numpy==2.1.1
-pandas==2.2.3
-scikit-learn==1.5.2
-
-# IA / Chatbot
-langchain==0.3.1
-langchain-openai==0.2.1
-langchain-anthropic==0.2.1
-
-# WebSockets (incluido en fastapi, pero explícito por claridad)
-websockets==13.0.1
+# Configuración / variables de entorno
+pydantic==2.13.4
+pydantic-settings==2.14.2
+python-dotenv==1.2.2
