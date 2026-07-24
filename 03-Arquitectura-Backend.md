@@ -24,7 +24,7 @@ backend/
 ├── main.py                     # App FastAPI, CORS, carga de GeoJSON al startup
 ├── config.py                   # Settings (.env) + constantes de dominio (umbrales OMS, TTLs)
 ├── routers/
-│   ├── sectors.py              # GET /sectors, GET /sectors/{id}
+│   ├── sectors.py              # GET /sectors, GET /sectors/{id}, GET /sectors/{id}/sensores
 │   ├── risk.py                 # GET /risk/{sector}
 │   └── education.py            # GET /education
 ├── services/
@@ -90,7 +90,31 @@ Detalle de un sector: PM2.5, CO2, humedad y timestamp exactos (última hora), m�
 }
 ```
 
-`historial_24h` (actualizado 2026-07-23, `services/clickhouse_client.py:promedio_horario`) es el promedio de PM2.5 por hora de los sensores del sector en las últimas `HORAS_HISTORIAL_SECTOR` horas (24 por defecto, `config.py`), ya calibrado por humedad igual que el resto de los valores de PM2.5 — nunca el crudo. Si el sector no tiene sensores mapeados, o ninguno tuvo lecturas en la ventana, llega como lista vacía `[]` (nunca se rellena con datos inventados). No es un endpoint nuevo: es el mismo `GET /sectors/{id}` con un campo adicional, así que el contrato sigue siendo exactamente estos 4 endpoints.
+`historial_24h` (actualizado 2026-07-23, `services/clickhouse_client.py:promedio_horario`) es el promedio de PM2.5 por hora de los sensores del sector en las últimas `HORAS_HISTORIAL_SECTOR` horas (24 por defecto, `config.py`), ya calibrado por humedad igual que el resto de los valores de PM2.5 — nunca el crudo. Si el sector no tiene sensores mapeados, o ninguno tuvo lecturas en la ventana, llega como lista vacía `[]` (nunca se rellena con datos inventados). No es un endpoint nuevo: es el mismo `GET /sectors/{id}` con un campo adicional.
+
+### `GET /sectors/{id}/sensores`
+Sensores individuales dentro de un sector — sin agregar, a diferencia de `GET /sectors/{id}` que solo trae promedios. Agregado el 2026-07-24 para la pestaña "Sensores" del detalle de sector (`04-Arquitectura-Frontend.md`), que hasta entonces no tenía datos que mostrar.
+
+**Response:**
+```json
+{
+  "sensores": [
+    {
+      "nombre": "D29ESP32DED2FF6",
+      "lat": 3.3995819091796875,
+      "lon": -76.53419494628906,
+      "pm25_promedio": 5.14,
+      "co2_promedio": 0.0,
+      "hum_promedio": 99.99,
+      "ultima_lectura": "2026-07-24T06:29:42",
+      "estado": "verde",
+      "sin_datos_recientes": false
+    }
+  ]
+}
+```
+
+**Lógica interna:** reusa `obtener_mapeo_sensor_sector()` (ya cacheado ~1h, ver §2.3 de `06-Plan-de-Accion.md`) para saber qué sensores pertenecen al sector, y `ultimo_promedio_por_sensor()` (la misma query que ya usa `GET /sectors` y `GET /sectors/{id}`) para su última lectura — no agrega ninguna query nueva a ClickHouse. Un sensor puede estar en el mapeo pero sin ninguna lectura en la última hora (esa query solo cubre la última hora): en ese caso llega con `estado: "gris"`, `sin_datos_recientes: true` y `lat`/`lon` en `null`, porque no vale la pena una consulta extra solo para ubicar un sensor inactivo. `404` si el `sector_id` no existe, igual que `GET /sectors/{id}`.
 
 ### `GET /risk/{sector}`
 Perfil histórico: peor mes, mejor mes, promedio anual, días sobre límite OMS.
@@ -217,7 +241,7 @@ CLICKHOUSE_SECURE=True
 
 ## 7. Contrato de API con el frontend
 
-Estos cuatro endpoints son el contrato completo entre backend y frontend. El equipo de Flutter puede construir su capa de datos (modelos, cliente HTTP) directamente contra estas respuestas sin esperar a que el backend esté 100% desplegado — basta con fijar el contrato temprano y, si hace falta, levantar un servidor de datos de prueba con estas mismas formas de respuesta.
+Estos cinco endpoints son el contrato completo entre backend y frontend. El equipo de Flutter puede construir su capa de datos (modelos, cliente HTTP) directamente contra estas respuestas sin esperar a que el backend esté 100% desplegado — basta con fijar el contrato temprano y, si hace falta, levantar un servidor de datos de prueba con estas mismas formas de respuesta.
 
 ---
 

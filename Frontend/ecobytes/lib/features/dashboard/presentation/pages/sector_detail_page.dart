@@ -16,11 +16,10 @@ import '../../domain/models/sector.dart';
 import '../providers/sector_detail_provider.dart';
 
 /// Detalle de un sector, alcanzado desde el mapa ("Ver detalle del sector" o
-/// tap en un polígono) — no es un ítem de navegación propio. Dos pestañas:
-/// Resumen (indicadores actuales + evolución 24h, `GET /sectors/{id}`) e
-/// Historia (perfil histórico anual, `GET /risk/{sector}`). La pestaña
-/// "Sensores" del Figma se dejó fuera: ningún endpoint expone sensores
-/// individuales por sector todavía (ver 05-Discrepancias.md §2.1).
+/// tap en un polígono) — no es un ítem de navegación propio. Tres pestañas:
+/// Resumen (indicadores actuales + evolución 24h, `GET /sectors/{id}`),
+/// Historia (perfil histórico anual, `GET /risk/{sector}`) y Sensores
+/// (sensores individuales del sector, `GET /sectors/{id}/sensores`).
 class SectorDetailPage extends StatefulWidget {
   const SectorDetailPage({super.key, required this.sectorId});
 
@@ -47,6 +46,7 @@ class _SectorDetailPageState extends State<SectorDetailPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<SectorDetailProvider>().cargarDetalle(widget.sectorId);
+      context.read<SectorDetailProvider>().cargarSensores(widget.sectorId);
       context.read<RiskProvider>().cargarRiesgo(widget.sectorId);
     });
   }
@@ -96,9 +96,13 @@ class _SectorDetailPageState extends State<SectorDetailPage> {
                               Consumer<SectorDetailProvider>(
                                 builder: (context, provider, _) => _ResumenTab(provider: provider),
                               )
-                            else
+                            else if (_tabIndex == 1)
                               Consumer<RiskProvider>(
                                 builder: (context, provider, _) => _HistoriaTab(provider: provider),
+                              )
+                            else
+                              Consumer<SectorDetailProvider>(
+                                builder: (context, provider, _) => _SensoresTab(provider: provider),
                               ),
                             const SizedBox(height: AppSpacing.xl),
                             const _ActionButtons(),
@@ -174,7 +178,7 @@ class _TabSelector extends StatelessWidget {
   final int index;
   final ValueChanged<int> onChanged;
 
-  static const _tabs = ['Resumen', 'Historia'];
+  static const _tabs = ['Resumen', 'Historia', 'Sensores'];
 
   @override
   Widget build(BuildContext context) {
@@ -369,6 +373,24 @@ class _HistorialChart extends StatelessWidget {
             maxY: maxY,
             gridData: const FlGridData(show: true, drawVerticalLine: false),
             borderData: FlBorderData(show: false),
+            // Sin esto, fl_chart pinta el texto del tooltip con el mismo
+            // color de la línea (AppColors.primaryGreen, un verde oscuro)
+            // sobre su fondo por defecto (blueGrey oscuro) — dos colores
+            // oscuros superpuestos, casi ilegible. Se fuerza texto claro.
+            lineTouchData: LineTouchData(
+              touchTooltipData: LineTouchTooltipData(
+                getTooltipItems: (spots) => spots.map((spot) {
+                  return LineTooltipItem(
+                    '${spot.y.toStringAsFixed(1)} µg/m³',
+                    const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
             titlesData: FlTitlesData(
               rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -579,6 +601,107 @@ class _MesStat extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _SensoresTab extends StatelessWidget {
+  const _SensoresTab({required this.provider});
+
+  final SectorDetailProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (provider.estadoSensores) {
+      case EstadoSensores.inicial:
+      case EstadoSensores.cargando:
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+          child: Center(child: CircularProgressIndicator()),
+        );
+      case EstadoSensores.error:
+        return _ErrorState(
+          mensaje: provider.mensajeErrorSensores ?? 'No fue posible cargar los sensores.',
+          onRetry: () => provider.cargarSensores(provider.sectorActual!),
+        );
+      case EstadoSensores.listo:
+        final sensores = provider.sensores;
+        if (sensores.isEmpty) {
+          return const EcoCard(
+            child: SizedBox(
+              height: 120,
+              child: Center(
+                child: Text(
+                  'Este sector no tiene sensores de la red Tángara registrados.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                ),
+              ),
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionLabel(
+              text: '${sensores.length} SENSOR${sensores.length == 1 ? '' : 'ES'} EN ESTE SECTOR',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            for (final sensor in sensores)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: _SensorTile(sensor: sensor),
+              ),
+          ],
+        );
+    }
+  }
+}
+
+class _SensorTile extends StatelessWidget {
+  const _SensorTile({required this.sensor});
+
+  final SensorDeSector sensor;
+
+  @override
+  Widget build(BuildContext context) {
+    return EcoCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sensor.nombre,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  sensor.ultimaLectura != null
+                      ? 'Última lectura ${_formatearRelativo(sensor.ultimaLectura!)}'
+                      : 'Sin lecturas recientes',
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                sensor.tieneDatos ? '${sensor.pm25Promedio!.toStringAsFixed(1)} µg/m³' : '—',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              ),
+              const SizedBox(height: 2),
+              StatusBadge(label: sensor.estado.label, color: sensor.estado.color),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

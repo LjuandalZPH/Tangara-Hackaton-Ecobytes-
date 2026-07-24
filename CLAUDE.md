@@ -19,9 +19,9 @@ Los archivos `01-Arquitectura.md`, `02-Backlog.md`, `03-Arquitectura-Backend.md`
 | Objetivo documentado (lo que debe existir) | Código actual (deuda pendiente de corregir) |
 | --- | --- |
 | Backend sin estado propio, ClickHouse (capa Plata) como única fuente de datos, GeoJSON + `shapely` para sectores | ✅ **Cerrado.** El backend ya no tiene BD propia: `services/clickhouse_client.py` consulta la capa Plata y `services/geo.py` resuelve sectores con `shapely` sobre `data/sectores.geojson` |
-| Solo 4 endpoints: `/sectors`, `/sectors/{id}`, `/risk/{sector}`, `/education` | ✅ **Cerrado.** Son exactamente los routers que existen (`sectors`, `risk`, `education`); `sensors`, `auth`, `chatbot` y `game` fueron eliminados |
+| Solo 4 endpoints: `/sectors`, `/sectors/{id}`, `/risk/{sector}`, `/education` | ✅ **Cerrado** (con una adición justificada, 2026-07-24). Son exactamente los routers que existen (`sectors`, `risk`, `education`); `sensors`, `auth`, `chatbot` y `game` fueron eliminados. Se agregó un **5º endpoint**, `GET /sectors/{id}/sensores`, para la pestaña "Sensores" del detalle de sector (respaldada por el Figma, antes bloqueada por falta de este endpoint) — no reintroduce ningún router retirado, solo extiende `sectors.py` |
 | Sin autenticación, acceso abierto | ✅ **Cerrado.** No hay modelo `User` ni JWT: se eliminaron junto con la capa Postgres |
-| Frontend: `Provider`, landing + mapa + aprende + chatbot, rutas `/`, `/mapa`, `/aprende`, `/chatbot` (actualizado 2026-07-23 según Figma) | **`Provider` ✅ cerrado**, **rutas ✅ cerradas**, **detalle de sector ✅ cerrado** (2026-07-23): `sector_detail_page.dart` en `/mapa/:sectorId` con pestañas Resumen/Historia (Sensores queda fuera por falta de endpoint, ver `05-Discrepancias.md` §2.1) |
+| Frontend: `Provider`, landing + mapa + aprende + chatbot, rutas `/`, `/mapa`, `/aprende`, `/chatbot` (actualizado 2026-07-23 según Figma) | **`Provider` ✅ cerrado**, **rutas ✅ cerradas**, **detalle de sector ✅ cerrado** (2026-07-23): `sector_detail_page.dart` en `/mapa/:sectorId` con pestañas Resumen/Historia/Sensores — las tres pestañas del Figma, la última cerrada el 2026-07-24 al agregar `GET /sectors/{id}/sensores` |
 
 **Nota (2026-07-23):** las carpetas de plataforma nativa (`android/`, `ios/`, `macos/`, `linux/`, `windows/`) dejaron de ser deuda pendiente — el equipo decidió conservarlas para poder compilar builds nativos (ej. APK) a demanda, aunque web siga siendo el target de despliegue. `04-Arquitectura-Frontend.md` ya refleja esto como objetivo, no como desviación; `T-00.1` del backlog quedó obsoleta. Ver `06-Plan-de-Accion.md` §3.
 
@@ -70,7 +70,7 @@ No hay suite de tests ni linter configurado en el backend todavía.
 - **`services/clickhouse_client.py`** — único punto de acceso a datos. Cliente async contra `tangara_plata`, con las queries parametrizadas y la agregación de lecturas. No hay ORM ni BD propia.
 - **`services/geo.py`** — `SectorIndex`: carga `data/sectores.geojson` con `shapely` al arrancar y resuelve point-in-polygon (`resolver_sector(lat, lon)`). Normaliza el esquema del archivo (`comcodigo`/`comnombre`) al contrato público de la API (`comuna-2` / `Comuna 2`). También construye y cachea el mapeo `sensor_name → sector_id` a partir del geohash de cada sensor.
 - **`services/cache.py`** — cachés en memoria con TTL corto (~30 s para `/sectors`, ~1 h para el mapeo sensor→sector), para absorber el polling del frontend sin golpear ClickHouse en cada refresco.
-- **`routers/`** — `sectors.py` (`GET /sectors`, `GET /sectors/{id}`), `risk.py` (`GET /risk/{sector}`), `education.py` (`GET /education`, sirve `data/educacion.json`). No hay más endpoints que estos cuatro más `/health`.
+- **`routers/`** — `sectors.py` (`GET /sectors`, `GET /sectors/{id}`, `GET /sectors/{id}/sensores`), `risk.py` (`GET /risk/{sector}`), `education.py` (`GET /education`, sirve `data/educacion.json`). No hay más endpoints que estos cinco más `/health`.
 - **`data/sectores.geojson`** — las 22 comunas de Cali (fuente oficial IDESC/Alcaldía, WGS84). Va versionado; ver `Backend/data/README.md` para la fuente y cómo redescargarlo.
 
 ## Frontend (`Frontend/ecobytes/`)
@@ -101,7 +101,7 @@ flutter build web --release  # build de producción
 
 ## Contrato API backend↔frontend
 
-El backend expone exactamente los endpoints documentados: `GET /sectors`, `GET /sectors/{id}`, `GET /risk/{sector}` y `GET /education` (más `/health`). El contrato vigente es el de `03-Arquitectura-Backend.md` §3, y el `id` de sector en las URLs es el normalizado (`comuna-2`, no `"02"`).
+El backend expone exactamente los endpoints documentados: `GET /sectors`, `GET /sectors/{id}`, `GET /sectors/{id}/sensores`, `GET /risk/{sector}` y `GET /education` (más `/health`). El contrato vigente es el de `03-Arquitectura-Backend.md` §3, y el `id` de sector en las URLs es el normalizado (`comuna-2`, no `"02"`).
 
 **El mapa ya está conectado a datos reales** (2026-07-23): `SectorsProvider` hace polling de `GET /sectors` cada 45 s y `MapArea` pinta los 22 polígonos de comuna. **Antes de tocar la integración, lee [`07-Integracion-Backend-Frontend.md`](./07-Integracion-Backend-Frontend.md)** — documenta cómo levantar ambos procesos, el paso de CORS que siempre se olvida, el flujo del dato de punta a punta, qué se verificó y qué sigue sin conectar.
 
