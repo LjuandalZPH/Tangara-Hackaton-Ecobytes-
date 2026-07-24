@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart'; 
 
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_spacing.dart';
-import '../../../../core/router/app_router.dart'; 
-import '../../../../core/utils/responsive.dart';
-import '../../../../shared/widgets/eco_bytes_logo.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_spacing.dart';
+import '../../core/router/app_router.dart';
+import '../../core/utils/responsive.dart';
+import 'eco_bytes_logo.dart';
 
 class LandingFooter extends StatelessWidget {
   const LandingFooter({super.key});
@@ -44,7 +44,7 @@ class LandingFooter extends StatelessWidget {
     final proyectoColumn = _FooterColumn(
       title: 'PROYECTO',
       links: const [
-        ('BitAVIT Labs', AppRoutes.landing),
+        ('Bit&Volt Labs', AppRoutes.landing),
         ('Universidad del Valle', AppRoutes.landing),
         ('Hackathon Tángara', AppRoutes.landing),
         ('Código abierto', AppRoutes.landing),
@@ -112,7 +112,7 @@ class LandingFooter extends StatelessWidget {
                 ),
                 if (isMobile) const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'BitAVIT Labs · Universidad del Valle',
+                  'Bit&Volt Labs · Universidad del Valle',
                   style: TextStyle(
                     color: AppColors.textOnDark.withValues(alpha: 0.5),
                     fontSize: 13,

@@ -251,8 +251,11 @@ Electrónica lo valide contra un equipo de referencia (tarea `T-01.1`).
 ## 8. Deuda pendiente
 
 - **`features/landing/` sigue con `MockSensorRepository`** (`hero_section.dart`,
-  `dashboard_preview_section.dart`). La arquitectura la marca para eliminación, así
-  que no se conectó. Sus números son inventados.
+  `dashboard_preview_section.dart`). La landing se conserva permanentemente
+  (respaldada por el Figma del equipo, ver `05-Discrepancias.md` §2), así que sus
+  números (`StatsBar`: "47 sensores", "2.4M ciudadanos", "22 comunas cubiertas")
+  merecen revisión: confirmar si son reales/objetivo o solo ilustrativas del
+  diseño — hoy la red solo cubre 7 de 22 comunas.
 - **`_SidePanelSection` de `map_page.dart` es el mayor foco de datos inventados
   que quedan.** Todo esto se le muestra al usuario como si fuera real:
   - `map_page.dart:287` — `"Actualizado hace 3 min · Cali, Colombia"` fijo, sin
@@ -266,7 +269,10 @@ Electrónica lo valide contra un equipo de referencia (tarea `T-01.1`).
     centro") sin ningún cálculo detrás.
   - `map_page.dart:372` y `386` — los botones "Preguntar al chatbot" y "Ver detalle
     del sector" tienen `onPressed: () {}`: UI que aparenta funcionar y no hace nada.
-    El segundo debería llamar a `RiskProvider`, que ya existe y está ocioso.
+    El primero debería navegar a `/chatbot`; el segundo debería navegar a
+    `sector_detail_page.dart` (pendiente de construir, ver `06-Plan-de-Accion.md`
+    §3 paso 9), que a su vez usa `RiskProvider` (ya existe y está ocioso) para su
+    pestaña "Historia".
 - **`dashboard_layout.dart` es código muerto** (nadie instancia `DashboardLayout`).
   `control_sidebar.dart` **no** lo es: lo usa `dashboard_preview_section.dart:10,62,78`
   en la landing, alimentado por `MockSensorRepository`. Eliminarlo exige tocar
@@ -275,8 +281,10 @@ Electrónica lo valide contra un equipo de referencia (tarea `T-01.1`).
   `RiskProvider` y el cliente existen y funcionan, pero nada los invoca.
 - **`GET /education` sin conectar.** La página Aprende sirve contenido estático
   propio en vez del `data/educacion.json` del backend.
-- **`widget_test.dart` falla** por un overflow de layout en
-  `landing_footer.dart:54`. Es preexistente, verificado que ya fallaba antes de
-  esta integración.
+- **`widget_test.dart` falla** por un overflow de layout en `landing_footer.dart`
+  (ahora en `shared/widgets/`, el número de línea original ya no aplica tras el
+  movimiento del archivo). Es preexistente, verificado que ya fallaba antes de
+  esta integración — pendiente de diagnosticar y arreglar (ver `06-Plan-de-Accion.md`
+  §3 paso 3).
 - **No hay tests** del parseo, los providers ni los endpoints. La verificación de
   §6 fue manual y puntual, no automatizada.

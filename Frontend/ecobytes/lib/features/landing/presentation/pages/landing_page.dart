@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../../shared/widgets/landing_footer.dart';
+import '../../../../shared/widgets/landing_header.dart';
 import '../widgets/cta_section.dart';
 import '../widgets/dashboard_preview_section.dart';
 import '../widgets/features_section.dart';
 import '../widgets/hero_section.dart';
 import '../widgets/how_it_works_section.dart';
-import '../widgets/landing_footer.dart';
-import '../widgets/landing_header.dart';
 import '../widgets/stats_bar.dart';
 
 class LandingPage extends StatefulWidget {

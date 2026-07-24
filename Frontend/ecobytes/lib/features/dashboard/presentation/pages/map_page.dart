@@ -4,8 +4,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../../shared/widgets/status_badge.dart'; // Contiene EcoCard y SectionLabel
-import '../../../landing/presentation/widgets/landing_footer.dart';
-import '../../../landing/presentation/widgets/landing_header.dart';
+import '../../../../shared/widgets/landing_footer.dart';
+import '../../../../shared/widgets/landing_header.dart';
 import '../../domain/models/sector.dart';
 import '../providers/sectors_provider.dart';
 import '../widgets/map_area.dart';

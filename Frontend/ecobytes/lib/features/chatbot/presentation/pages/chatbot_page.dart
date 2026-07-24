@@ -3,8 +3,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../../shared/widgets/status_badge.dart'; // Contiene EcoCard y SectionLabel
-import '../../../landing/presentation/widgets/landing_footer.dart';
-import '../../../landing/presentation/widgets/landing_header.dart';
+import '../../../../shared/widgets/landing_footer.dart';
+import '../../../../shared/widgets/landing_header.dart';
 
 // Modelo local temporal para pintar el flujo visual del chat
 class _ChatMessage {
