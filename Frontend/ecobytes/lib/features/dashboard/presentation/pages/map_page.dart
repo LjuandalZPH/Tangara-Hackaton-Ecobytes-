@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../../shared/widgets/status_badge.dart'; // Contiene EcoCard y SectionLabel
 import '../../../../shared/widgets/landing_footer.dart';
@@ -267,6 +269,8 @@ class _SidePanelSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sectorSeleccionado = context.watch<SectorsProvider>().sectorSeleccionado;
+
     return EcoCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
@@ -367,7 +371,7 @@ class _SidePanelSection extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () => context.go(AppRoutes.chatbot),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGreen,
                 foregroundColor: Colors.white,
@@ -381,13 +385,23 @@ class _SidePanelSection extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () {},
+              // Sin sector seleccionado (ningún tap en el mapa todavía) no
+              // hay a dónde navegar — se deshabilita en vez de ir a un
+              // detalle arbitrario.
+              onPressed: sectorSeleccionado == null
+                  ? null
+                  : () => context.go(AppRoutes.sectorDetailPath(sectorSeleccionado.id)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.black87,
                 side: const BorderSide(color: AppColors.borderLight),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('Ver detalle del sector', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              child: Text(
+                sectorSeleccionado == null
+                    ? 'Selecciona un sector en el mapa'
+                    : 'Ver detalle del sector',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         ],

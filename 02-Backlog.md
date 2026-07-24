@@ -26,7 +26,7 @@
 | EPI-01 | Limpieza y Preparación de la Base de Código |
 | EPI-02 | Capa de Datos e Integración con el Backend |
 | EPI-03 | Mapa por Sectores |
-| EPI-04 | Detalle de Sector (Historia y Sensores) |
+| EPI-04 | Detalle de Sector (Historia) |
 | EPI-05 | Contenido Educativo |
 
 ---
@@ -103,27 +103,27 @@
 
 ---
 
-## 📍 EPI-04 — Detalle de Sector (Historia y Sensores)
+## 📍 EPI-04 — Detalle de Sector (Historia)
 
-**Objetivo (corregido 2026-07-23):** este documento planeaba antes una pantalla `/risk` completamente nueva y separada, con selector de barrio propio. El Figma del equipo ("Detalle de Producto") muestra otra cosa: **no hay pantalla ni selector aparte** — se llega desde el mapa (botón "Ver detalle del sector" o tap en un sector, ver EPI-03/HU-02), y esta épica completa esa misma `sector_detail_page.dart` con las pestañas "Historia" y "Sensores" que le faltan a la pestaña "Resumen" ya cubierta en EPI-03. Por eso deja de ser independiente de EPI-03 (ver §🔗 Dependencias entre épicas).
+**Objetivo (corregido 2026-07-23):** este documento planeaba antes una pantalla `/risk` completamente nueva y separada, con selector de barrio propio. El Figma del equipo ("Detalle de Producto") muestra otra cosa: **no hay pantalla ni selector aparte** — se llega desde el mapa (botón "Ver detalle del sector" o tap en un sector, ver EPI-03/HU-02), y esta épica completa esa misma `sector_detail_page.dart` con la pestaña "Historia" que le falta a la pestaña "Resumen" ya cubierta en EPI-03. Por eso deja de ser independiente de EPI-03 (ver §🔗 Dependencias entre épicas).
 
-### HU-03 — Perfil histórico y sensores de un sector
-> Como ciudadano, padre o paciente vulnerable, quiero ver el perfil histórico de calidad del aire de un sector (peor mes, mejor mes, promedio anual, comparación con la norma OMS) y sus sensores, al entrar a su detalle desde el mapa.
+**Decisión (2026-07-23): la pestaña "Sensores" queda fuera de esta épica.** Ningún endpoint expone sensores individuales por sector — construirla habría significado inventar datos, algo que el equipo decidió evitar en todo el producto (mismo criterio aplicado antes al mapa y a la landing). Queda anotada como bloqueada por backend en `05-Discrepancias.md` §2.1, retomable si en el futuro se agrega un endpoint de sensores por sector.
+
+### HU-03 — Perfil histórico de un sector
+> Como ciudadano, padre o paciente vulnerable, quiero ver el perfil histórico de calidad del aire de un sector (peor mes, mejor mes, promedio anual, comparación con la norma OMS), al entrar a su detalle desde el mapa.
 
 **Criterios de aceptación:**
 - Se llega a esta vista desde el mapa (botón "Ver detalle del sector" o tap en un sector) — no hay un selector de barrio independiente ni una ruta `/riesgo` nueva.
 - La pestaña "Historia" muestra: promedio anual, peor mes, mejor mes, y días al año sobre la norma OMS.
 - Si el sector no tiene suficiente histórico (`historico_suficiente: false`), se indica claramente en vez de mostrar datos parciales sin contexto.
-- La pestaña "Sensores" muestra la ubicación y lista de sensores del sector en un mini-mapa.
 
 | ID | Tipo | Descripción | Prioridad | SP | Sprint | Dependencias |
 | --- | --- | --- | --- | --- | --- | --- |
-| T-04.1 | Tarea | Agregar la estructura de pestañas (Resumen / Historia / Sensores) a `sector_detail_page.dart`. | Alta | 2 | 2 | T-03.1 |
+| T-04.1 | Tarea | Agregar la estructura de pestañas (Resumen / Historia) a `sector_detail_page.dart`. | Alta | 2 | 2 | T-03.1 |
 | T-04.3 | Tarea | Crear `risk_profile_card.dart` para la pestaña "Historia": promedio anual, peor/mejor mes, días sobre OMS. | Alta | 3 | 2 | T-04.1 |
 | T-04.4 | Tarea | Conectar `RiskProvider` a la pestaña "Historia": fetch al entrar al detalle del sector, estados de carga/error, y aviso explícito cuando `historico_suficiente: false`. | Alta | 2 | 2 | T-01.6, T-04.1, T-04.3 |
-| T-04.6 | Tarea | Crear la pestaña "Sensores": mini-mapa con ubicación y lista de sensores del sector. | Media | 2 | 2 | T-04.1 |
 
-**Subtotal: 9 SP**
+**Subtotal: 7 SP** (T-04.6, la pestaña "Sensores", se retiró — ver DECISIÓN arriba)
 
 ---
 
@@ -166,9 +166,9 @@
 | --- | --- | --- |
 | Sprint 0 | Limpieza de la base de código Flutter y contrato de API | 7 |
 | Sprint 1 | Capa de datos + Mapa por sectores conectado | 19 |
-| Sprint 2 | Detalle de sector (historia y sensores) + sección educativa | 13 |
+| Sprint 2 | Detalle de sector (historia) + sección educativa | 11 |
 | Sprint 3 | QA final y despliegue | 5 |
-| **Total** | | **~44 SP** |
+| **Total** | | **~42 SP** |
 
 ---
 

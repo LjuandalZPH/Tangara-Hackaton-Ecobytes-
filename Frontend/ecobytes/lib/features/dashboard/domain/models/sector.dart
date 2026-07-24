@@ -133,6 +133,22 @@ class Sector {
   }
 }
 
+/// Promedio de PM2.5 de una hora específica, parte del historial corto
+/// (`historial_24h`) que trae `GET /sectors/{id}`.
+class HoraPromedio {
+  const HoraPromedio({required this.hora, required this.pm25Promedio});
+
+  final DateTime? hora;
+  final double? pm25Promedio;
+
+  factory HoraPromedio.fromJson(Map<String, dynamic> json) {
+    return HoraPromedio(
+      hora: json['hora'] != null ? DateTime.tryParse(json['hora'] as String) : null,
+      pm25Promedio: (json['pm25_promedio'] as num?)?.toDouble(),
+    );
+  }
+}
+
 /// Detalle de un sector obtenido de `GET /sectors/{id}`.
 class SectorDetalle {
   const SectorDetalle({
@@ -144,6 +160,7 @@ class SectorDetalle {
     required this.ultimaLectura,
     required this.sinDatosRecientes,
     required this.estado,
+    required this.historial24h,
   });
 
   final String id;
@@ -154,6 +171,11 @@ class SectorDetalle {
   final DateTime? ultimaLectura;
   final bool sinDatosRecientes;
   final EstadoSector estado;
+
+  /// Promedio de PM2.5 por hora de las últimas ~24h. Puede llegar vacío si
+  /// el sector no tiene sensores o ninguno tuvo lecturas en la ventana — en
+  /// ese caso la UI debe mostrarlo explícitamente, nunca inventar puntos.
+  final List<HoraPromedio> historial24h;
 
   factory SectorDetalle.fromJson(Map<String, dynamic> json) {
     return SectorDetalle(
@@ -167,6 +189,9 @@ class SectorDetalle {
           : null,
       sinDatosRecientes: json['sin_datos_recientes'] as bool? ?? true,
       estado: EstadoSectorX.fromApi(json['estado'] as String?),
+      historial24h: ((json['historial_24h'] as List?) ?? [])
+          .map((e) => HoraPromedio.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }

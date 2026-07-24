@@ -58,3 +58,7 @@ TTL_MAPEO_SENSOR_SECTOR_SEGUNDOS = 3600  # 1 hora, las posiciones no cambian
 
 # Mínimo de meses de histórico para considerar el perfil de riesgo confiable
 MIN_MESES_HISTORICO_SUFICIENTE = 3
+
+# Ventana del historial horario ("Evolución de la calidad del aire") que
+# devuelve GET /sectors/{id}
+HORAS_HISTORIAL_SECTOR = 24
