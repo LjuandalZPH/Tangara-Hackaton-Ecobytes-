@@ -1,0 +1,34 @@
+# Variables de entorno — NUNCA subir al repo
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Docker
+*.log
+
+# Datos CSV de Tángara (pueden ser pesados) — no ignora data/ completa:
+# sectores.geojson y educacion.json sí deben versionarse (ver 03-Arquitectura-Backend.md §8)
+*.csv
+*.csv.gz
+
+# Grafo de conocimiento generado por graphify (~2 MB, regenerable con /graphify)
+graphify-out/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# macOS / Windows
+.DS_Store
+Thumbs.db

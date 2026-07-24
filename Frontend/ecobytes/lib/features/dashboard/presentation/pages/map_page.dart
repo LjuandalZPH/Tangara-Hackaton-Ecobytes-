@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../../shared/widgets/status_badge.dart'; // Contiene EcoCard y SectionLabel
 import '../../../landing/presentation/widgets/landing_footer.dart';
 import '../../../landing/presentation/widgets/landing_header.dart';
+import '../../domain/models/sector.dart';
+import '../providers/sectors_provider.dart';
+import '../widgets/map_area.dart';
 
 class MapaPage extends StatefulWidget {
   const MapaPage({super.key});
@@ -86,9 +90,11 @@ class _MapAreaSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sectorsProvider = context.watch<SectorsProvider>();
+
     return Column(
       children: [
-        // El contenedor del mapa físico simulado
+        // El contenedor del mapa
         AspectRatio(
           aspectRatio: context.isMobile ? 1.1 : 1.35,
           child: Container(
@@ -97,192 +103,122 @@ class _MapAreaSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.borderLight),
             ),
-            child: Stack(
-              children: [
-                // 1. Fondo simulación de cuadrícula/mapa técnico
-                Positioned.fill(
-                  child: Opacity(
-                    opacity: 0.15,
-                    child: GridPaper(
-                      color: Colors.blueGrey.shade800,
-                      divisions: 2,
-                      subdivisions: 1,
-                      interval: 100,
-                    ),
-                  ),
-                ),
-                
-                // Texto indicador en el fondo
-                const Center(
-                  child: Text(
-                    '[ Espacio reservado para mapa interactivo ]\nCali, Valle del Cauca',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.w500, fontSize: 14),
-                  ),
-                ),
-
-                // 2. CARD FLOTANTE: Alerta Ambiental (Arriba Izquierda)
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  width: 260,
-                  child: _buildAlertaFlotante(),
-                ),
-
-                // 3. PIN FLOTANTE: Info del sensor El Peñón (Centro Superior)
-                Positioned(
-                  top: context.isMobile ? 120 : 160,
-                  left: context.isMobile ? 80 : 260,
-                  child: _buildSensorMarker(),
-                ),
-
-                // 4. LEYENDA DE CALIDAD DEL AIRE (Abajo Izquierda)
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  child: _buildLeyendaMapa(),
-                ),
-              ],
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: _buildContenidoMapa(context, sectorsProvider),
           ),
         ),
         const SizedBox(height: AppSpacing.md),
         // Barra de estadísticas inferior
-        const _BottomMetricsBar(),
+        _BottomMetricsBar(sectores: sectorsProvider.sectores),
       ],
     );
   }
 
-  Widget _buildAlertaFlotante() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
-          ),
-          const SizedBox(width: 10),
-          const Expanded(
+  Widget _buildContenidoMapa(BuildContext context, SectorsProvider provider) {
+    switch (provider.estado) {
+      case EstadoCarga.cargando:
+        return const Center(child: CircularProgressIndicator());
+      case EstadoCarga.error:
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Alerta ambiental', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.redAccent)),
-                SizedBox(height: 2),
+                const Icon(Icons.cloud_off, color: AppColors.textMuted, size: 32),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'El sector industrial presenta niveles elevados de PM2.5. Se recomienda evitar la zona.',
-                  style: TextStyle(fontSize: 11, color: AppColors.textMuted, height: 1.3),
+                  provider.mensajeError ??
+                      'No fue posible cargar los sectores.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ElevatedButton(
+                  onPressed: provider.cargar,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Reintentar'),
                 ),
               ],
             ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSensorMarker() {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8)],
           ),
-          child: const Column(
-            children: [
-              Text('Centro — El Peñón', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-              SizedBox(height: 2),
-              Row(
-                children: [
-                  Icon(Icons.circle, color: Colors.amber, size: 10),
-                  SizedBox(width: 4),
-                  Text('AQI 55 · Moderado', style: TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        Container(width: 2, height: 15, color: Colors.black45),
-        const Icon(Icons.location_on, color: Colors.amber, size: 24),
-      ],
-    );
-  }
-
-  Widget _buildLeyendaMapa() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('CALIDAD DEL AIRE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
-          SizedBox(height: 6),
-          _LeyendaItem(color: Colors.green, text: 'Buena (AQI 0-50)'),
-          _LeyendaItem(color: Colors.amber, text: 'Moderada (51-100)'),
-          _LeyendaItem(color: Colors.orange, text: 'Mala (101-150)'),
-          _LeyendaItem(color: Colors.red, text: 'Peligrosa (151+)'),
-        ],
-      ),
-    );
-  }
-}
-
-class _LeyendaItem extends StatelessWidget {
-  final Color color;
-  final String text;
-  const _LeyendaItem({required this.color, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(Icons.circle, color: color, size: 10),
-          const SizedBox(width: 6),
-          Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
+        );
+      case EstadoCarga.listo:
+        return MapArea(
+          sectores: provider.sectores,
+          sectorSeleccionadoId: provider.sectorSeleccionado?.id,
+          onSectorTap: provider.seleccionarSector,
+        );
+    }
   }
 }
 
 // BARRA INFERIOR DE MÉTRICAS (Debajo del mapa)
-// BARRA INFERIOR DE MÉTRICAS (Optimizada contra desbordamientos)
+// Calculada a partir de los sectores reales entregados por el backend.
 class _BottomMetricsBar extends StatelessWidget {
-  const _BottomMetricsBar();
+  const _BottomMetricsBar({required this.sectores});
+
+  final List<Sector> sectores;
 
   @override
   Widget build(BuildContext context) {
+    final conDatos = sectores.where((s) => s.tieneDatos).toList();
+
+    Sector? mejor;
+    Sector? peor;
+    double? promedioCali;
+
+    if (conDatos.isNotEmpty) {
+      mejor = conDatos.reduce(
+        (a, b) => a.pm25Promedio! < b.pm25Promedio! ? a : b,
+      );
+      peor = conDatos.reduce(
+        (a, b) => a.pm25Promedio! > b.pm25Promedio! ? a : b,
+      );
+      final suma = conDatos.fold<double>(0, (acc, s) => acc + s.pm25Promedio!);
+      promedioCali = suma / conDatos.length;
+    }
+
     return EcoCard(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribución fluida
         children: [
-          Expanded(child: _buildBottomStat('🟢 MEJOR ZONA', 'La Buitrera', 'AQI 18')),
+          Expanded(
+            child: _buildBottomStat(
+              '🟢 MEJOR ZONA',
+              mejor?.nombre ?? 'Sin datos',
+              mejor != null
+                  ? '${mejor.pm25Promedio!.toStringAsFixed(1)} µg/m³'
+                  : '—',
+            ),
+          ),
           const SizedBox(width: 4),
-          Expanded(child: _buildBottomStat('🔴 PEOR ZONA', 'Zona Industrial', 'AQI 108')),
+          Expanded(
+            child: _buildBottomStat(
+              '🔴 PEOR ZONA',
+              peor?.nombre ?? 'Sin datos',
+              peor != null
+                  ? '${peor.pm25Promedio!.toStringAsFixed(1)} µg/m³'
+                  : '—',
+            ),
+          ),
           const SizedBox(width: 4),
-          Expanded(child: _buildBottomStat('📊 PROMEDIO CALI', 'AQI 52', '16 µg/m³ PM2.5')),
-          if (context.isDesktop) ...[
-            const SizedBox(width: 4),
-            Expanded(child: _buildBottomStat('📈 TENDENCIA 24H', 'Estable', '+2% vs ayer')),
-          ],
+          Expanded(
+            child: _buildBottomStat(
+              '📊 PROMEDIO CALI',
+              promedioCali != null
+                  ? '${promedioCali.toStringAsFixed(1)} µg/m³'
+                  : '—',
+              '${conDatos.length} de ${sectores.length} comunas con datos',
+            ),
+          ),
         ],
       ),
     );
@@ -296,7 +232,7 @@ class _BottomMetricsBar extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            label, 
+            label,
             style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold),
           ),
         ),
@@ -305,7 +241,7 @@ class _BottomMetricsBar extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            value, 
+            value,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
           ),
         ),
@@ -313,7 +249,7 @@ class _BottomMetricsBar extends StatelessWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            sub, 
+            sub,
             style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
           ),
         ),
