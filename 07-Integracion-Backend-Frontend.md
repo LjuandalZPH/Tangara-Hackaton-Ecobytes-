@@ -253,32 +253,38 @@ Electrónica lo valide contra un equipo de referencia (tarea `T-01.1`).
 
 ## 8. Deuda pendiente
 
-- **`features/landing/` sigue con `MockSensorRepository`** (`hero_section.dart`,
-  `dashboard_preview_section.dart`). La landing se conserva permanentemente
-  (respaldada por el Figma del equipo, ver `05-Discrepancias.md` §2), así que sus
-  números (`StatsBar`: "47 sensores", "2.4M ciudadanos", "22 comunas cubiertas")
-  merecen revisión: confirmar si son reales/objetivo o solo ilustrativas del
-  diseño — hoy la red solo cubre 7 de 22 comunas.
-- **`_SidePanelSection` de `map_page.dart` es el mayor foco de datos inventados
-  que quedan.** Todo esto se le muestra al usuario como si fuera real:
-  - `map_page.dart:287` — `"Actualizado hace 3 min · Cali, Colombia"` fijo, sin
-    relación con `SectorsProvider.ultimaActualizacion`, que sí existe.
-  - `map_page.dart:330-334` — PM2.5 `18`, CO2 `420 ppm`, O3 `67 %`. La unidad del
-    O3 ni siquiera es plausible (se mide en ppb o µg/m³, no en porcentaje), y el
-    backend no expone O3 en absoluto.
-  - `map_page.dart:342-344` — nombres de zona inventados ("Buitrera", "Cordoba
-    city"), AQIs fijos (18, 108, 52) y un typo bilingüe ("sensor más contaminated").
-  - `map_page.dart:359` — texto que insinúa un análisis geográfico ("zonas sur y
-    centro") sin ningún cálculo detrás.
+- ✅ **`features/landing/` migrada completa a datos reales (2026-07-24).**
+  La landing se conserva permanentemente (respaldada por el Figma del equipo,
+  ver `05-Discrepancias.md` §2), pero ya no muestra ningún dato inventado:
+  `StatsBar` calcula en vivo desde `SectorsProvider` cuántas de las 22 comunas
+  tienen datos recientes y el PM2.5 promedio ciudad; `hero_section.dart`
+  reemplazó el overlay "ARROYO HONDO/AQI 82" y las 3 `MetricCard` fijas por la
+  comuna real con mejor PM2.5 del momento y 3 métricas reales (PM2.5 promedio,
+  cobertura, última actualización); `dashboard_preview_section.dart` ahora le
+  pasa `sectores` reales a `MapArea` (antes quedaba en blanco) y reemplazó
+  `ControlSidebar` por `_PreviewSidebar` con indicadores/comunas destacadas
+  reales. `MockSensorRepository`, `sensor_data.dart`, `control_sidebar.dart` y
+  `dashboard_layout.dart` se borraron por completo (ver `05-Discrepancias.md`
+  §2.1 para el detalle línea por línea). Ver `06-Plan-de-Accion.md` §3 paso 10.
+- ✅ **`_SidePanelSection` de `map_page.dart` conectada a datos reales (2026-07-24).**
+  Ya no se muestran datos inventados al usuario:
+  - `"Actualizado hace 3 min · Cali, Colombia"` fijo → ahora usa
+    `SectorsProvider.ultimaActualizacion` con un formateador de tiempo relativo
+    (mismo patrón que ya usaba `sector_detail_page.dart`).
+  - PM2.5 `18`/CO2 `420 ppm`/O3 `67 %` fijos → se quitaron CO2 y O3 (ninguno de
+    los dos existe en el contrato de `/sectors`, y O3 no lo expone el backend en
+    absoluto) y PM2.5 ahora sale de `sectorSeleccionado.pm25Promedio`.
+  - Nombres de zona inventados ("Buitrera", "Cordoba city") y AQIs fijos →
+    eliminados; esa comparación ciudad-completa ya la resuelve
+    `_BottomMetricsBar` con datos reales (mejor/peor comuna, promedio Cali), no
+    hacía falta duplicarla con datos falsos.
+  - Texto de recomendación fijo ("zonas sur y centro") → reemplazado por texto
+    derivado del `estado` real del sector seleccionado (verde/amarillo/rojo/gris).
   - ✅ `map_page.dart:372` y `386` — corregido (2026-07-23): los botones "Preguntar
     al chatbot" y "Ver detalle del sector" ya no tienen `onPressed: () {}`. El
     primero navega a `/chatbot`; el segundo navega a `sector_detail_page.dart`
     con el sector que el usuario tocó en el mapa (deshabilitado si no hay
     ninguno seleccionado). Ver `06-Plan-de-Accion.md` §3 paso 9.
-- **`dashboard_layout.dart` es código muerto** (nadie instancia `DashboardLayout`).
-  `control_sidebar.dart` **no** lo es: lo usa `dashboard_preview_section.dart:10,62,78`
-  en la landing, alimentado por `MockSensorRepository`. Eliminarlo exige tocar
-  también esa sección.
 - ✅ **`GET /risk/{sector}` y `GET /sectors/{id}` ya tienen UI (2026-07-23).**
   `sector_detail_page.dart`, ver arriba y `06-Plan-de-Accion.md` §3 paso 9.
 - **`GET /education` sin conectar.** La página Aprende sirve contenido estático

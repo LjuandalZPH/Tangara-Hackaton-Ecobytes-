@@ -1,21 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/responsive.dart';
+import '../../../dashboard/presentation/providers/sectors_provider.dart';
+
+/// Total de comunas de Cali cubiertas por el GeoJSON de sectores
+/// (`Backend/data/sectores.geojson`) — es el alcance geográfico fijo de la
+/// app, no la cantidad de comunas con sensores reportando en este momento.
+const _totalComunasCali = 22;
 
 class StatsBar extends StatelessWidget {
   const StatsBar({super.key});
 
-  static const _stats = [
-    (value: '47', label: 'Sensores activos', icon: Icons.sensors),
-    (value: '24/7', label: 'Monitoreo continuo', icon: Icons.schedule),
-    (value: '22', label: 'Comunas cubiertas', icon: Icons.location_city),
-    (value: '2.4M', label: 'Ciudadanos informados', icon: Icons.people_outline),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final sectores = context.watch<SectorsProvider>().sectores;
+    final conDatos = sectores.where((s) => s.tieneDatos).toList();
+    final promedioCiudad = conDatos.isEmpty
+        ? null
+        : conDatos.fold<double>(0, (acc, s) => acc + s.pm25Promedio!) / conDatos.length;
+
+    final stats = [
+      (
+        value: sectores.isEmpty ? '—' : '${conDatos.length}/$_totalComunasCali',
+        label: 'Comunas con datos en tiempo real',
+        icon: Icons.sensors,
+      ),
+      (value: '24/7', label: 'Monitoreo continuo', icon: Icons.schedule),
+      (
+        value: '$_totalComunasCali',
+        label: 'Comunas monitoreadas en Cali',
+        icon: Icons.location_city,
+      ),
+      (
+        value: promedioCiudad == null ? '—' : '${promedioCiudad.toStringAsFixed(1)} µg/m³',
+        label: 'PM2.5 promedio ciudad',
+        icon: Icons.air,
+      ),
+    ];
+
     return Container(
       width: double.infinity,
       color: AppColors.surfaceMuted,
@@ -31,7 +56,7 @@ class StatsBar extends StatelessWidget {
               spacing: AppSpacing.lg,
               runSpacing: AppSpacing.lg,
               alignment: WrapAlignment.center,
-              children: _stats
+              children: stats
                   .map(
                     (stat) => SizedBox(
                       width: itemWidth,

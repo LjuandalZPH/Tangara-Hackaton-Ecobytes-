@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/responsive.dart';
-import '../../../../features/dashboard/data/repositories/mock_sensor_repository.dart';
-import '../../../../features/dashboard/domain/models/sensor_data.dart';
 import '../../../../shared/widgets/metric_card.dart';
+import '../../../dashboard/domain/models/sector.dart';
+import '../../../dashboard/presentation/providers/sectors_provider.dart';
+
+/// Total de comunas de Cali cubiertas por el GeoJSON de sectores — mismo
+/// alcance geográfico fijo que ya usa `StatsBar` en esta misma página.
+const _totalComunasCali = 22;
 
 class HeroSection extends StatelessWidget {
   const HeroSection({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final metrics = MockSensorRepository.landingMetrics;
+    final provider = context.watch<SectorsProvider>();
     final isStacked = context.isMobile;
 
     return ContentContainer(
@@ -35,7 +40,7 @@ class HeroSection extends StatelessWidget {
             SizedBox(height: isStacked ? AppSpacing.xxl : 0, width: isStacked ? 0 : AppSpacing.xxl),
             Expanded(
               flex: isStacked ? 0 : 6,
-              child: _HeroVisual(metrics: metrics),
+              child: _HeroVisual(provider: provider),
             ),
           ],
         ),
@@ -123,12 +128,25 @@ class _HeroCopy extends StatelessWidget {
 }
 
 class _HeroVisual extends StatelessWidget {
-  const _HeroVisual({required this.metrics});
+  const _HeroVisual({required this.provider});
 
-  final LandingMetrics metrics;
+  final SectorsProvider provider;
 
   @override
   Widget build(BuildContext context) {
+    final sectores = provider.sectores;
+    final conDatos = sectores.where((s) => s.tieneDatos).toList();
+
+    Sector? mejor;
+    double? promedioCiudad;
+    if (conDatos.isNotEmpty) {
+      mejor = conDatos.reduce(
+        (a, b) => a.pm25Promedio! < b.pm25Promedio! ? a : b,
+      );
+      final suma = conDatos.fold<double>(0, (acc, s) => acc + s.pm25Promedio!);
+      promedioCiudad = suma / conDatos.length;
+    }
+
     return Column(
       children: [
         AspectRatio(
@@ -175,7 +193,7 @@ class _HeroVisual extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'ARROYO HONDO',
+                        'MEJOR COMUNA HOY',
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
                               fontSize: 11,
                               letterSpacing: 1,
@@ -183,9 +201,12 @@ class _HeroVisual extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'AQI 82',
+                        mejor != null
+                            ? '${mejor.nombre} · ${mejor.pm25Promedio!.toStringAsFixed(1)} µg/m³'
+                            : 'Cargando…',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: AppColors.statusPoor,
+                              color: mejor?.estado.color ?? AppColors.textMuted,
+                              fontSize: 18,
                             ),
                       ),
                     ],
@@ -202,6 +223,9 @@ class _HeroVisual extends StatelessWidget {
             final itemWidth =
                 (constraints.maxWidth - (columns - 1) * AppSpacing.md) / columns;
 
+            final estadoPromedio =
+                promedioCiudad != null ? estadoDesdePm25(promedioCiudad) : null;
+
             return Wrap(
               spacing: AppSpacing.md,
               runSpacing: AppSpacing.md,
@@ -209,30 +233,37 @@ class _HeroVisual extends StatelessWidget {
                 SizedBox(
                   width: itemWidth,
                   child: MetricCard(
-                    label: metrics.pm25.label,
-                    value: '${metrics.pm25.value} ${metrics.pm25.unit}',
-                    statusLabel: metrics.pm25.statusLabel,
-                    statusColor: metrics.pm25.statusColor,
+                    label: 'PM2.5 promedio',
+                    value: promedioCiudad != null
+                        ? '${promedioCiudad.toStringAsFixed(1)} µg/m³'
+                        : '—',
+                    statusLabel: estadoPromedio?.label ?? 'Cargando',
+                    statusColor: estadoPromedio?.color ?? AppColors.textMuted,
                     compact: true,
                   ),
                 ),
                 SizedBox(
                   width: itemWidth,
                   child: MetricCard(
-                    label: metrics.co2.label,
-                    value: '${metrics.co2.value} ${metrics.co2.unit}',
-                    statusLabel: metrics.co2.statusLabel,
-                    statusColor: metrics.co2.statusColor,
+                    label: 'Cobertura',
+                    value: sectores.isEmpty
+                        ? '—'
+                        : '${conDatos.length}/$_totalComunasCali',
+                    statusLabel: sectores.isEmpty ? 'Cargando' : 'Comunas con datos',
+                    statusColor:
+                        sectores.isEmpty ? AppColors.textMuted : AppColors.primaryGreen,
                     compact: true,
                   ),
                 ),
                 SizedBox(
                   width: itemWidth,
                   child: MetricCard(
-                    label: metrics.humidity.label,
-                    value: '${metrics.humidity.value}${metrics.humidity.unit}',
-                    statusLabel: metrics.humidity.statusLabel,
-                    statusColor: metrics.humidity.statusColor,
+                    label: 'Actualización',
+                    value: provider.ultimaActualizacion != null
+                        ? _formatearRelativo(provider.ultimaActualizacion!)
+                        : '—',
+                    statusLabel: 'Cada 45s',
+                    statusColor: AppColors.primaryGreen,
                     compact: true,
                   ),
                 ),
@@ -260,8 +291,8 @@ class _CaliMapPreviewPainter extends CustomPainter {
     final colors = [
       AppColors.statusGood,
       AppColors.statusModerate,
-      AppColors.statusPoor,
-      AppColors.statusExcellent,
+      AppColors.statusBad,
+      AppColors.statusGood,
     ];
 
     for (var r = 0; r < rows; r++) {
@@ -293,4 +324,16 @@ class _CaliMapPreviewPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Formatea una fecha como tiempo relativo corto ("hace 3 min", "hace 2 h").
+/// Si el reloj del cliente va detrás del servidor, la diferencia puede salir
+/// negativa — se trata igual que "justo ahora" en vez de mostrar un número
+/// negativo confuso.
+String _formatearRelativo(DateTime fecha) {
+  final diferencia = DateTime.now().difference(fecha);
+  if (diferencia.isNegative || diferencia.inMinutes < 1) return 'justo ahora';
+  if (diferencia.inMinutes < 60) return 'hace ${diferencia.inMinutes} min';
+  if (diferencia.inHours < 24) return 'hace ${diferencia.inHours} h';
+  return 'hace ${diferencia.inDays} días';
 }

@@ -30,20 +30,22 @@ class _ChatbotPageState extends State<ChatbotPage> {
   bool _menuOpen = false;
   final TextEditingController _textController = TextEditingController();
 
-  // Historial de mensajes idéntico a tu captura de pantalla
+  // Historial de mensajes de ejemplo. Usa el mismo vocabulario que el resto
+  // del producto (comunas, PM2.5 en µg/m³, estados verde/amarillo/rojo/gris)
+  // en vez de un "AQI" o nombres de barrio que la API no expone.
   final List<_ChatMessage> _messages = [
     const _ChatMessage(
-      text: '¡Hola! Soy tu asistente ambiental. Hoy el AQI promedio en Cali es 52 (Moderado). ¿En qué puedo ayudarte?',
+      text: '¡Hola! Soy tu asistente ambiental. Hoy la calidad del aire promedio en Cali es moderada (amarillo). ¿En qué puedo ayudarte?',
       isUser: false,
     ),
     const _ChatMessage(
-      text: '¿Es seguro salir a trotar por el barrio San Fernando ahora?',
+      text: '¿Es seguro salir a trotar por la Comuna 17 ahora?',
       isUser: true,
     ),
     const _ChatMessage(
-      text: 'El sensor de San Fernando registra actualmente AQI 18 (Bueno), uno de los más limpios de la ciudad. Es un excelente momento para trotar. Te recomiendo evitar la Av. Roosevelt por el tráfico.',
+      text: 'La Comuna 17 tiene actualmente un PM2.5 bajo (estado verde), una de las zonas más limpias de la ciudad. Es un excelente momento para trotar. Te recomiendo evitar las avenidas de mayor tráfico.',
       isUser: false,
-      actionButtons: ['Ver mapa de Cali', 'Recomendación de hoy', 'Comparar sensores'],
+      actionButtons: ['Ver mapa de Cali', 'Recomendación de hoy', 'Comparar comunas'],
     ),
     const _ChatMessage(
       text: 'Gracias, ¿y mañana cómo estará?',
@@ -54,7 +56,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
   final List<String> _preguntasFrecuentes = [
     '¿Puedo hacer ejercicio hoy?',
     'Explícame qué es PM2.5',
-    '¿Cuál es el sensor más cercano?',
+    '¿Cuál es la comuna con mejor aire hoy?',
   ];
 
   @override
