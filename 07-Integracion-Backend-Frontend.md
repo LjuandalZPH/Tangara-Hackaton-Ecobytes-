@@ -83,13 +83,14 @@ consola — el mapa quedará en estado de error, no vacío.
 
 ## 3. Contrato en uso
 
-Los cuatro endpoints documentados en `03-Arquitectura-Backend.md` §3 son los que
+Los cinco endpoints documentados en `03-Arquitectura-Backend.md` §3 son los que
 existen. Estado de consumo desde el frontend:
 
 | Endpoint | Consumido por | Estado |
 | --- | --- | --- |
 | `GET /sectors` | `SectorsProvider` (polling 45 s) | ✅ Conectado |
 | `GET /sectors/{id}` | `SectorDetailProvider` (bajo demanda) | ✅ Conectado (2026-07-23), pestaña "Resumen" de `sector_detail_page.dart` |
+| `GET /sectors/{id}/sensores` | `SectorDetailProvider` (bajo demanda) | ✅ Conectado (2026-07-24), pestaña "Sensores" de `sector_detail_page.dart` |
 | `GET /risk/{sector}` | `RiskProvider` (bajo demanda) | ✅ Conectado (2026-07-23), pestaña "Historia" de `sector_detail_page.dart` |
 | `GET /education` | — | ❌ Sin conectar (la página Aprende usa contenido estático propio) |
 
@@ -287,6 +288,9 @@ Electrónica lo valide contra un equipo de referencia (tarea `T-01.1`).
     ninguno seleccionado). Ver `06-Plan-de-Accion.md` §3 paso 9.
 - ✅ **`GET /risk/{sector}` y `GET /sectors/{id}` ya tienen UI (2026-07-23).**
   `sector_detail_page.dart`, ver arriba y `06-Plan-de-Accion.md` §3 paso 9.
+- ✅ **`GET /sectors/{id}/sensores` agregado y conectado (2026-07-24).** Tercera
+  pestaña "Sensores" de `sector_detail_page.dart` — ver detalle completo en
+  `05-Discrepancias.md` §2.1 y el contrato en `03-Arquitectura-Backend.md` §3.
 - **`GET /education` sin conectar.** La página Aprende sirve contenido estático
   propio en vez del `data/educacion.json` del backend.
 - ✅ **`widget_test.dart` corregido (2026-07-23).** El overflow de layout en

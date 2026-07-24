@@ -39,6 +39,14 @@ class ApiClient {
     return SectorDetalle.fromJson(json);
   }
 
+  Future<List<SensorDeSector>> getSensoresDeSector(String id) async {
+    final json = await _getJson('/sectors/$id/sensores');
+    final sensores = (json['sensores'] as List?) ?? [];
+    return sensores
+        .map((e) => SensorDeSector.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<Riesgo> getRiesgo(String sectorId) async {
     final json = await _getJson('/risk/$sectorId');
     return Riesgo.fromJson(json);

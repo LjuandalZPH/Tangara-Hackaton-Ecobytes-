@@ -107,7 +107,7 @@
 
 **Objetivo (corregido 2026-07-23):** este documento planeaba antes una pantalla `/risk` completamente nueva y separada, con selector de barrio propio. El Figma del equipo ("Detalle de Producto") muestra otra cosa: **no hay pantalla ni selector aparte** — se llega desde el mapa (botón "Ver detalle del sector" o tap en un sector, ver EPI-03/HU-02), y esta épica completa esa misma `sector_detail_page.dart` con la pestaña "Historia" que le falta a la pestaña "Resumen" ya cubierta en EPI-03. Por eso deja de ser independiente de EPI-03 (ver §🔗 Dependencias entre épicas).
 
-**Decisión (2026-07-23): la pestaña "Sensores" queda fuera de esta épica.** Ningún endpoint expone sensores individuales por sector — construirla habría significado inventar datos, algo que el equipo decidió evitar en todo el producto (mismo criterio aplicado antes al mapa y a la landing). Queda anotada como bloqueada por backend en `05-Discrepancias.md` §2.1, retomable si en el futuro se agrega un endpoint de sensores por sector.
+**✅ Pestaña "Sensores" construida (2026-07-24) — la decisión de 2026-07-23 de dejarla fuera quedó superada.** Estaba bloqueada porque ningún endpoint exponía sensores individuales por sector; se desbloqueó agregando `GET /sectors/{id}/sensores` (reusa el mapeo sensor→sector y la query de última lectura ya existentes, sin datos inventados — mismo criterio que se mantuvo todo el proyecto). Detalle completo en `05-Discrepancias.md` §2.1 y `06-Plan-de-Accion.md` §3 paso 12.
 
 ### HU-03 — Perfil histórico de un sector
 > Como ciudadano, padre o paciente vulnerable, quiero ver el perfil histórico de calidad del aire de un sector (peor mes, mejor mes, promedio anual, comparación con la norma OMS), al entrar a su detalle desde el mapa.
@@ -122,8 +122,9 @@
 | T-04.1 | Tarea | Agregar la estructura de pestañas (Resumen / Historia) a `sector_detail_page.dart`. | Alta | 2 | 2 | T-03.1 |
 | T-04.3 | Tarea | Crear `risk_profile_card.dart` para la pestaña "Historia": promedio anual, peor/mejor mes, días sobre OMS. | Alta | 3 | 2 | T-04.1 |
 | T-04.4 | Tarea | Conectar `RiskProvider` a la pestaña "Historia": fetch al entrar al detalle del sector, estados de carga/error, y aviso explícito cuando `historico_suficiente: false`. | Alta | 2 | 2 | T-01.6, T-04.1, T-04.3 |
+| T-04.6 | Tarea | ✅ Agregar pestaña "Sensores": endpoint `GET /sectors/{id}/sensores` (backend) + modelo `SensorDeSector`, `SectorDetailProvider` extendido y UI de lista de sensores (frontend). | Media | 2 | — | T-04.1 |
 
-**Subtotal: 7 SP** (T-04.6, la pestaña "Sensores", se retiró — ver DECISIÓN arriba)
+**Subtotal: 9 SP** (T-04.6 se había retirado el 2026-07-23 por falta de endpoint — se reincorporó y cerró el 2026-07-24, ver DECISIÓN arriba)
 
 ---
 

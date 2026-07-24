@@ -35,6 +35,11 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isNull);
 
+    // Igual para "Sensores" (GET /sectors/{id}/sensores).
+    await tester.tap(find.text('Sensores'));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+
     // Desmonta para no dejar ningún estado pendiente entre tests.
     await tester.pumpWidget(const SizedBox.shrink());
   });

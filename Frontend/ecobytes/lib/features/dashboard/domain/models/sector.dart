@@ -208,3 +208,53 @@ class SectorDetalle {
     );
   }
 }
+
+/// Un sensor individual dentro de un sector, tal como llega de
+/// `GET /sectors/{id}/sensores`. A diferencia de [SectorDetalle] (promedios
+/// agregados del sector), esto es la lectura de un sensor puntual.
+class SensorDeSector {
+  const SensorDeSector({
+    required this.nombre,
+    required this.lat,
+    required this.lon,
+    required this.pm25Promedio,
+    required this.co2Promedio,
+    required this.humPromedio,
+    required this.ultimaLectura,
+    required this.estado,
+    required this.sinDatosRecientes,
+  });
+
+  final String nombre;
+  final double? lat;
+  final double? lon;
+  final double? pm25Promedio;
+  final double? co2Promedio;
+  final double? humPromedio;
+  final DateTime? ultimaLectura;
+  final EstadoSector estado;
+
+  /// Un sensor puede estar en el mapeo sensor→sector (se conoce su
+  /// existencia) pero sin ninguna lectura en la última hora — en ese caso
+  /// llega sin `lat`/`lon` tampoco, porque el backend no hace una consulta
+  /// extra solo para ubicar sensores inactivos.
+  final bool sinDatosRecientes;
+
+  bool get tieneDatos => !sinDatosRecientes && pm25Promedio != null;
+
+  factory SensorDeSector.fromJson(Map<String, dynamic> json) {
+    return SensorDeSector(
+      nombre: json['nombre'] as String? ?? '',
+      lat: (json['lat'] as num?)?.toDouble(),
+      lon: (json['lon'] as num?)?.toDouble(),
+      pm25Promedio: (json['pm25_promedio'] as num?)?.toDouble(),
+      co2Promedio: (json['co2_promedio'] as num?)?.toDouble(),
+      humPromedio: (json['hum_promedio'] as num?)?.toDouble(),
+      ultimaLectura: json['ultima_lectura'] != null
+          ? DateTime.tryParse(json['ultima_lectura'] as String)
+          : null,
+      estado: EstadoSectorX.fromApi(json['estado'] as String?),
+      sinDatosRecientes: json['sin_datos_recientes'] as bool? ?? true,
+    );
+  }
+}

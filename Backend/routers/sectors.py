@@ -1,7 +1,8 @@
 """
 Router: Sectores
-GET /sectors       — todos los sectores con su estado actual (para el mapa).
-GET /sectors/{id}  — detalle (pm25, co2, hum, timestamp) de un sector.
+GET /sectors             — todos los sectores con su estado actual (para el mapa).
+GET /sectors/{id}        — detalle (pm25, co2, hum, timestamp) de un sector.
+GET /sectors/{id}/sensores — sensores individuales dentro de un sector.
 """
 
 from datetime import datetime, timezone
@@ -166,3 +167,64 @@ async def get_sector_detail(sector_id: str, request: Request):
         "estado": _estado_por_pm25(pm25_promedio) if reciente else "gris",
         "historial_24h": historial_24h,
     }
+
+
+@router.get("/{sector_id}/sensores")
+async def get_sector_sensores(sector_id: str, request: Request):
+    """Sensores individuales dentro de un sector, sin agregar: nombre,
+    ubicación (si se conoce una lectura reciente) y su última lectura.
+    Complementa a `get_sector_detail`, que solo trae el promedio del sector."""
+    sector_index = request.app.state.sector_index
+    sector = sector_index.sector_por_id(sector_id)
+    if sector is None:
+        raise HTTPException(status_code=404, detail=f"Sector '{sector_id}' no encontrado.")
+
+    mapeo_sensor_sector = await obtener_mapeo_sensor_sector(sector_index)
+    sensores_del_sector = {
+        name for name, sid in mapeo_sensor_sector.items() if sid == sector_id
+    }
+
+    lecturas = await clickhouse_client.ultimo_promedio_por_sensor()
+    lecturas_por_nombre = {l["name"]: l for l in lecturas}
+
+    sensores_respuesta = []
+    for nombre in sorted(sensores_del_sector):
+        lectura = lecturas_por_nombre.get(nombre)
+
+        # Sensor conocido (está en el mapeo sensor→sector) pero sin ninguna
+        # lectura en la última hora: `ultimo_promedio_por_sensor()` no lo
+        # trae en absoluto, así que no hay coords/valores que mostrar, solo
+        # que existe y está inactivo — igual que "gris" a nivel de sector.
+        if lectura is None:
+            sensores_respuesta.append(
+                {
+                    "nombre": nombre,
+                    "lat": None,
+                    "lon": None,
+                    "pm25_promedio": None,
+                    "co2_promedio": None,
+                    "hum_promedio": None,
+                    "ultima_lectura": None,
+                    "estado": "gris",
+                    "sin_datos_recientes": True,
+                }
+            )
+            continue
+
+        reciente = _es_reciente(lectura["ultima_lectura"])
+        coords = lectura.get("coords") or {}
+        sensores_respuesta.append(
+            {
+                "nombre": nombre,
+                "lat": coords.get("latitude"),
+                "lon": coords.get("longitude"),
+                "pm25_promedio": lectura["pm25_promedio"],
+                "co2_promedio": lectura["co2_promedio"],
+                "hum_promedio": lectura["hum_promedio"],
+                "ultima_lectura": lectura["ultima_lectura"],
+                "estado": _estado_por_pm25(lectura["pm25_promedio"]) if reciente else "gris",
+                "sin_datos_recientes": not reciente,
+            }
+        )
+
+    return {"sensores": sensores_respuesta}
