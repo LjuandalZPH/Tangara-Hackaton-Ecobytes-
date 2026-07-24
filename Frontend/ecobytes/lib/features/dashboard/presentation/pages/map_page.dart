@@ -269,7 +269,8 @@ class _SidePanelSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sectorSeleccionado = context.watch<SectorsProvider>().sectorSeleccionado;
+    final provider = context.watch<SectorsProvider>();
+    final sector = provider.sectorSeleccionado;
 
     return EcoCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -277,16 +278,16 @@ class _SidePanelSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Panel de calidad del aire', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          
-          // SOLUCIÓN 1: Usamos un Wrap en lugar de Row para el subtítulo 
+
+          // SOLUCIÓN 1: Usamos un Wrap en lugar de Row para el subtítulo
           // por si el texto es muy largo en pantallas pequeñas.
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Icon(Icons.circle, color: Colors.green, size: 8),
+              Icon(Icons.circle, color: _colorConexion(provider), size: 8),
               const SizedBox(width: 4),
               Text(
-                'Actualizado hace 3 min · Cali, Colombia', 
+                _textoConexion(provider),
                 style: const TextStyle(color: Colors.grey, fontSize: 11),
                 overflow: TextOverflow.ellipsis, // Si no cabe, mete tres puntitos (...)
               ),
@@ -294,77 +295,52 @@ class _SidePanelSection extends StatelessWidget {
           ),
           const Divider(height: 32, color: AppColors.borderLight),
 
-          // Estado General Card
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(12)),
-            child: Row(
-              children: [
-                Icon(Icons.wb_cloudy_outlined, color: Colors.amber.shade700, size: 32),
-                const SizedBox(width: 12),
-                Expanded( // Protege los textos dentro del Row
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Moderado', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.amber.shade900)),
-                      const Text('AQI promedio ciudad: 52', style: TextStyle(fontSize: 11, color: Colors.black54)),
-                    ],
-                  ),
-                )
-              ],
+          if (sector == null)
+            _buildSinSeleccion()
+          else ...[
+            _buildEstadoCard(sector),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              _descripcionPara(sector),
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 12, height: 1.4),
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          const Text(
-            'La calidad del aire es aceptable para la mayoría de las personas. Algunos grupos sensibles pueden experimentar síntomas leves.',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12, height: 1.4),
-          ),
-          const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.lg),
 
-          // Métricas Promedio
-          const SectionLabel(text: 'MÉTRICAS ACTUALES PROMEDIO'),
-          const SizedBox(height: AppSpacing.sm),
-          
-          // SOLUCIÓN 2: En lugar de un Row rígido, usamos Expanded en cada métrica 
-          // para que se encojan equitativamente según el ancho del panel.
-          Row(
-            children: [
-              Expanded(child: _buildMiniMetric('PM2.5', '18', 'µg/m³')),
-              const SizedBox(width: 6),
-              Expanded(child: _buildMiniMetric('CO2', '420', 'ppm')),
-              const SizedBox(width: 6),
-              Expanded(child: _buildMiniMetric('O3', '67', '%')),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-
-          // Insights rápidos
-          const SectionLabel(text: 'INSIGHTS RÁPIDOS'),
-          const SizedBox(height: AppSpacing.sm),
-          _buildInsightRow('Sensor más limpio', 'Buitrera', 'AQI 18', Colors.green),
-          _buildInsightRow('Sensor más contaminated', 'Cordoba city', 'AQI 108', Colors.redAccent),
-          _buildInsightRow('Promedio ciudad', '16 µg/m³', 'AQI 52', Colors.blueGrey),
-          const SizedBox(height: AppSpacing.lg),
-
-          // Recomendación
-          const SectionLabel(text: 'RECOMENDACIÓN'),
-          const SizedBox(height: AppSpacing.sm),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10)),
-            child: Row(
-              children: [
-                Icon(Icons.directions_walk, color: Colors.green.shade700),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Buen momento para caminar o realizar actividad física ligera en zonas sur y centro de la ciudad.',
-                    style: TextStyle(fontSize: 11, color: Colors.black87, height: 1.3),
-                  ),
-                ),
-              ],
+            const SectionLabel(text: 'MÉTRICA ACTUAL'),
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              width: 110,
+              child: _buildMiniMetric(
+                'PM2.5',
+                sector.tieneDatos ? sector.pm25Promedio!.toStringAsFixed(1) : '—',
+                'µg/m³',
+                sector.estado.color,
+              ),
             ),
-          ),
+            const SizedBox(height: AppSpacing.lg),
+
+            const SectionLabel(text: 'RECOMENDACIÓN'),
+            const SizedBox(height: AppSpacing.sm),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: sector.estado.color.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(_iconoPara(sector.estado), color: sector.estado.color),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _recomendacionPara(sector.estado),
+                      style: const TextStyle(fontSize: 11, color: Colors.black87, height: 1.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.xl),
 
           // Botones de acción inferiores
@@ -388,16 +364,16 @@ class _SidePanelSection extends StatelessWidget {
               // Sin sector seleccionado (ningún tap en el mapa todavía) no
               // hay a dónde navegar — se deshabilita en vez de ir a un
               // detalle arbitrario.
-              onPressed: sectorSeleccionado == null
+              onPressed: sector == null
                   ? null
-                  : () => context.go(AppRoutes.sectorDetailPath(sectorSeleccionado.id)),
+                  : () => context.go(AppRoutes.sectorDetailPath(sector.id)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.black87,
                 side: const BorderSide(color: AppColors.borderLight),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               child: Text(
-                sectorSeleccionado == null
+                sector == null
                     ? 'Selecciona un sector en el mapa'
                     : 'Ver detalle del sector',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -409,12 +385,115 @@ class _SidePanelSection extends StatelessWidget {
     );
   }
 
+  /// Verde solo si el último polling fue exitoso; ámbar si falló pero se
+  /// conservan datos previos (`SectorsProvider` nunca borra `_sectores` en un
+  /// refresco fallido); gris mientras carga la primera vez.
+  Color _colorConexion(SectorsProvider provider) {
+    if (provider.estado == EstadoCarga.cargando) return AppColors.textMuted;
+    if (provider.mensajeError != null) return AppColors.statusModerate;
+    return AppColors.statusGood;
+  }
+
+  String _textoConexion(SectorsProvider provider) {
+    if (provider.mensajeError != null) {
+      return 'Sin conexión, mostrando el último dato disponible · Cali, Colombia';
+    }
+    return provider.ultimaActualizacion != null
+        ? 'Actualizado ${_formatearRelativo(provider.ultimaActualizacion!)} · Cali, Colombia'
+        : 'Cali, Colombia';
+  }
+
+  Widget _buildSinSeleccion() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.touch_app_outlined, color: AppColors.textMuted, size: 28),
+          const SizedBox(height: AppSpacing.sm),
+          const Text(
+            'Selecciona un sector en el mapa para ver su calidad del aire actual.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEstadoCard(Sector sector) {
+    final color = sector.estado.color;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        children: [
+          Icon(_iconoPara(sector.estado), color: color, size: 32),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(sector.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(
+                  'Calidad del aire: ${sector.estado.label}',
+                  style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _iconoPara(EstadoSector estado) {
+    switch (estado) {
+      case EstadoSector.verde:
+        return Icons.wb_sunny_outlined;
+      case EstadoSector.amarillo:
+        return Icons.wb_cloudy_outlined;
+      case EstadoSector.rojo:
+        return Icons.warning_amber_outlined;
+      case EstadoSector.gris:
+        return Icons.help_outline;
+    }
+  }
+
+  String _descripcionPara(Sector sector) {
+    if (!sector.tieneDatos) {
+      return 'Este sector no cuenta con sensores cercanos o su última lectura es demasiado antigua para considerarse confiable.';
+    }
+    switch (sector.estado) {
+      case EstadoSector.verde:
+        return 'La calidad del aire es buena y no representa un riesgo para la salud.';
+      case EstadoSector.amarillo:
+        return 'La calidad del aire es aceptable para la mayoría de las personas. Algunos grupos sensibles pueden experimentar síntomas leves.';
+      case EstadoSector.rojo:
+        return 'La calidad del aire es dañina. Se recomienda evitar la exposición prolongada al aire libre.';
+      case EstadoSector.gris:
+        return 'No hay datos suficientes para evaluar este sector.';
+    }
+  }
+
+  String _recomendacionPara(EstadoSector estado) {
+    switch (estado) {
+      case EstadoSector.verde:
+        return 'Buen momento para caminar o realizar actividad física al aire libre en este sector.';
+      case EstadoSector.amarillo:
+        return 'Grupos sensibles (niños, adultos mayores, personas con afecciones respiratorias) deben limitar la exposición prolongada.';
+      case EstadoSector.rojo:
+        return 'Evita actividad física prolongada al aire libre en este sector.';
+      case EstadoSector.gris:
+        return 'Sin datos suficientes para dar una recomendación confiable.';
+    }
+  }
+
   // SOLUCIÓN 3: Quitamos el 'width: 75' fijo para permitir que tome el tamaño dinámico del Expanded
-  Widget _buildMiniMetric(String label, String val, String unit) {
+  Widget _buildMiniMetric(String label, String val, String unit, Color valorColor) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.borderLight), 
+        border: Border.all(color: AppColors.borderLight),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -424,34 +503,24 @@ class _SidePanelSection extends StatelessWidget {
           const SizedBox(height: 4),
           FittedBox( // Mantiene el número dentro de los límites si la pantalla es enana
             fit: BoxFit.scaleDown,
-            child: Text(val, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+            child: Text(val, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: valorColor)),
           ),
           Text(unit, style: const TextStyle(fontSize: 9, color: AppColors.textMuted)),
         ],
       ),
     );
   }
+}
 
-  Widget _buildInsightRow(String title, String place, String aqi, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                Text(place, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(aqi, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
-        ],
-      ),
-    );
-  }
+/// Formatea una fecha como tiempo relativo corto ("hace 3 min", "hace 2 h").
+/// Si el reloj del cliente va detrás del servidor, la diferencia puede salir
+/// negativa — se trata igual que "justo ahora" en vez de mostrar un número
+/// negativo confuso.
+String _formatearRelativo(DateTime fecha) {
+  final diferencia = DateTime.now().difference(fecha);
+  if (diferencia.isNegative || diferencia.inMinutes < 1) return 'justo ahora';
+  if (diferencia.inMinutes < 60) return 'hace ${diferencia.inMinutes} min';
+  if (diferencia.inHours < 24) return 'hace ${diferencia.inHours} h';
+  return 'hace ${diferencia.inDays} días';
 }
 

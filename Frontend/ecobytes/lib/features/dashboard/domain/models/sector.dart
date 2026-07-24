@@ -49,6 +49,19 @@ extension EstadoSectorX on EstadoSector {
   }
 }
 
+/// Clasifica un valor crudo de PM2.5 (ej. un promedio calculado en el
+/// frontend, como el promedio ciudad) en (etiqueta, color) usando los mismos
+/// umbrales OMS que aplica el backend en `_estado_por_pm25`
+/// (`Backend/config.py`: `PM25_UMBRAL_BUENO=15`, `PM25_UMBRAL_MODERADO=35`).
+/// Para el `estado` de un sector individual siempre hay que preferir el que
+/// ya viene del backend (`Sector.estado`) — esta función es solo para números
+/// que el backend no clasifica por sí mismo.
+({String label, Color color}) estadoDesdePm25(double pm25) {
+  if (pm25 < 15) return (label: 'Buena', color: AppColors.statusGood);
+  if (pm25 <= 35) return (label: 'Moderada', color: AppColors.statusModerate);
+  return (label: 'Dañina', color: AppColors.statusBad);
+}
+
 /// Representa un sector (comuna) de Cali con su geometría y estado de
 /// calidad del aire, tal como llega de `GET /sectors`.
 class Sector {
