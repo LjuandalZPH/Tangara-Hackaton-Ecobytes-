@@ -1,4 +1,5 @@
-import 'package:ecobytes/app.dart';
+import 'package:ecobytes/core/router/app_router.dart';
+import 'package:ecobytes/core/theme/app_theme.dart';
 import 'package:ecobytes/features/dashboard/presentation/providers/sectors_provider.dart';
 import 'package:ecobytes/features/risk/presentation/providers/risk_provider.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp.router(
         title: 'EcoBytes Cali',
         debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
         routerConfig: appRouter, // Aquí le entregamos el control a nuestro archivo de rutas
       ),
     );

@@ -12,7 +12,10 @@ class LandingFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = context.isMobile;
+    // El layout de 4 columnas + social row necesita el ancho completo de
+    // desktop (≥1200, ver AppBreakpoints.desktop) para no desbordar — a
+    // tablet (600-1200) también se apila, no solo a mobile (<600).
+    final isMobile = !context.isDesktop;
 
     // Creamos los bloques de contenido para poder reutilizarlos fácilmente
     final infoColumn = Column(

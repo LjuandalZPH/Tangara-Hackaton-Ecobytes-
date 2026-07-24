@@ -281,10 +281,12 @@ Electrónica lo valide contra un equipo de referencia (tarea `T-01.1`).
   `RiskProvider` y el cliente existen y funcionan, pero nada los invoca.
 - **`GET /education` sin conectar.** La página Aprende sirve contenido estático
   propio en vez del `data/educacion.json` del backend.
-- **`widget_test.dart` falla** por un overflow de layout en `landing_footer.dart`
-  (ahora en `shared/widgets/`, el número de línea original ya no aplica tras el
-  movimiento del archivo). Es preexistente, verificado que ya fallaba antes de
-  esta integración — pendiente de diagnosticar y arreglar (ver `06-Plan-de-Accion.md`
-  §3 paso 3).
+- ✅ **`widget_test.dart` corregido (2026-07-23).** El overflow de layout en
+  `landing_footer.dart` (ahora en `shared/widgets/`) era real: la condición de
+  apilado usaba el breakpoint de *mobile* (`context.isMobile`, <600) en vez del
+  de *desktop* (`context.isDesktop`, ≥1200), así que cualquier ancho intermedio
+  —incluido el viewport 800×600 por defecto de `flutter_test`— desbordaba. Se
+  corrigió la condición a `!context.isDesktop`. Detalle completo en
+  `06-Plan-de-Accion.md` §3 paso 3.
 - **No hay tests** del parseo, los providers ni los endpoints. La verificación de
   §6 fue manual y puntual, no automatizada.
