@@ -12,6 +12,7 @@
 - Un mapa de Cali coloreado por sector según calidad del aire actual, con detalle por sector (indicadores actuales, perfil histórico, sensores).
 - Una sección educativa breve sobre PM2.5 y CO2.
 - Un chatbot ambiental (alcance confirmado por el diseño del equipo; implementación real en pausa hasta que se retome — ver `04-Arquitectura-Frontend.md` §8).
+- **Planificado, sin código todavía:** un kiosko físico (ESP32 + pantalla táctil) que replica en versión reducida el flujo landing→detalle de sector, como segundo cliente del mismo backend. Ver `08-Arquitectura-ESP32.md`.
 
 El alcance está pensado para demostrar el valor central del producto con el menor tiempo de desarrollo posible: acceso abierto sin cuentas de usuario, geometría de sectores resuelta con un archivo estático, datos que se refrescan por sondeo periódico, y una sola interfaz responsive que funciona igual en desktop y en teléfono, sin necesidad de instalar nada.
 
@@ -38,6 +39,10 @@ El alcance está pensado para demostrar el valor central del producto con el men
   │     └── Detalle de sector → pestañas Resumen / Historia (perfil histórico) / Sensores
   ├── Módulo Educativo   → contenido estático
   └── Chatbot            → alcance de producto confirmado por Figma; implementación en pausa
+
+[ ESP32 KIOSKO — planificado, sin código todavía (ver 08-Arquitectura-ESP32.md) ]
+  Mismo backend, mismos 5 endpoints, como segundo cliente HTTP
+  └── Landing (resumen de ciudad + selector de sector) → Detalle (Resumen/Historia/Sensores)
 ```
 
 **Principio de diseño:** un solo servicio backend sin estado propio (stateless), sin base de datos propia más allá del GeoJSON estático que vive en el repositorio. Toda la persistencia real de series de tiempo ya existe en ClickHouse — EcoBytes es una capa de consulta y presentación sobre ella, no un sistema nuevo de almacenamiento. El frontend, por su parte, es una única base de código Flutter con la web como target principal de despliegue (ver `04-Arquitectura-Frontend.md` §1 — las carpetas nativas se conservan para builds a demanda, no se despliegan).
@@ -79,3 +84,4 @@ El acceso desde teléfono se resuelve con diseño responsive dentro de la misma 
 - **02-Backlog.md** — Épicas e Historias de Usuario detalladas sobre esta arquitectura.
 - **03-Arquitectura-Backend.md** — Diseño detallado de endpoints, consultas ClickHouse y estructura del servicio FastAPI.
 - **04-Arquitectura-Frontend.md** — Diseño detallado de módulos Flutter, navegación y manejo de estado.
+- **08-Arquitectura-ESP32.md** — Diseño del kiosko físico ESP32 (planificado, sin código todavía).

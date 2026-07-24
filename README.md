@@ -30,6 +30,10 @@ Eliges tu barrio y recibes un perfil histórico de calidad del aire para ese pun
 
 Una pantalla clara que explica qué son el PM2.5 y el CO2, cómo afectan la salud y qué acciones concretas se pueden tomar — sin tecnicismos innecesarios.
 
+### 📟 Kiosko físico (planificado)
+
+Un ESP32 con pantalla táctil pensado como punto de consulta físico: mismo flujo landing → detalle de sector que la web, como segundo cliente del mismo backend. Todavía en diseño, sin código — ver [`08-Arquitectura-ESP32.md`](./08-Arquitectura-ESP32.md).
+
 ---
 
 ## ¿Para quién es?
@@ -68,6 +72,8 @@ Documentación técnica completa:
 4. [`04-Arquitectura-Frontend.md`](./04-Arquitectura-Frontend.md) — diseño detallado de la app Flutter.
 5. [`05-Discrepancias.md`](./05-Discrepancias.md) — diferencias entre esta arquitectura objetivo y el estado real del código.
 6. [`06-Plan-de-Accion.md`](./06-Plan-de-Accion.md) — plan concreto, con dependencias y prioridades, para cerrar esas diferencias.
+7. [`07-Integracion-Backend-Frontend.md`](./07-Integracion-Backend-Frontend.md) — estado real de la integración backend↔frontend.
+8. [`08-Arquitectura-ESP32.md`](./08-Arquitectura-ESP32.md) — diseño del kiosko físico ESP32 (planificado, sin código todavía).
 
 ---
 

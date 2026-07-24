@@ -27,6 +27,15 @@ Los archivos `01-Arquitectura.md`, `02-Backlog.md`, `03-Arquitectura-Backend.md`
 
 **Nota (2026-07-23):** landing y chatbot dejaron de ser deuda pendiente — están respaldados por el Figma del equipo. El chatbot mantiene su lugar en el producto (nav + pantalla propia), pero su implementación real (backend/LLM) queda en pausa hasta que un miembro del equipo la retome; no se toca su código ni su alcance mientras tanto. `T-00.4` del backlog quedó obsoleta.
 
+**Nota (2026-07-24):** hay un módulo nuevo en planificación, sin código todavía —
+un kiosko físico con ESP32 + pantalla táctil que replica (en versión reducida) el
+flujo landing→detalle de sector, consumiendo el mismo backend que el frontend
+Flutter. Su diseño vive en [`08-Arquitectura-ESP32.md`](./08-Arquitectura-ESP32.md)
+(distinto de los docs 01-07: ese documento describe qué se va a construir, no
+código existente que haya que alinear). No implica ningún cambio al contrato de
+los 5 endpoints — es un cliente más, igual que el frontend. El código, cuando
+exista, va en `Firmware/esp32-kiosko/`, hermano de `Backend/` y `Frontend/`.
+
 El backlog (`02-Backlog.md`, épica EPI-01) define el trabajo de limpieza técnica que sigue pendiente (resolver la duplicación de arranque `main.dart`/`app.dart`, corregir `test/widget_test.dart`, etc.), y lo marca como **bloqueante**: EPI-02 (capa de datos) depende explícitamente de que EPI-01 esté cerrado primero. Si te piden avanzar en el proyecto sin más contexto, prioriza cerrar esas brechas en el orden del backlog (IDs `T-00.x` en adelante) antes de construir features nuevas sobre la base desalineada. Solo trabajes deliberadamente "con lo que hay" si el usuario lo pide explícitamente para una tarea puntual.
 
 **Estado de la migración a ClickHouse: ya ejecutada.** El backend dejó de usar Postgres — se eliminaron `db/`, `models/`, los routers `sensors`/`auth`/`chatbot`/`game` y `scripts/ingest_csv.py`. `services/calibration.py` **sí se conserva** (se porteó de vuelta durante la migración): aplica la corrección de PM2.5 por humedad dentro de `services/clickhouse_client.py`, para que el valor crudo nunca llegue a `sectors.py`/`risk.py`. La fuente de datos es la capa **Plata** (`tangara_plata.plata_tangara_sensores`), no Gold: `tangara_gold` está marcada como "planificada" en el pipeline y el equipo decidió no esperarla. Ver `06-Plan-de-Accion.md` §1-2 y §2.5 para el detalle técnico (librería `clickhouse-connect`, variables de entorno, esquema de columnas, calibración). Las brechas que siguen abiertas están en `05-Discrepancias.md` y son sobre todo de frontend.
@@ -36,6 +45,7 @@ El backlog (`02-Backlog.md`, épica EPI-01) define el trabajo de limpieza técni
 ```
 Backend/     — FastAPI (Python), sin BD propia: lee del ClickHouse público de Tángara
 Frontend/ecobytes/ — Flutter (Dart), app multi-plataforma (target: solo web)
+Firmware/esp32-kiosko/ — planificado, todavía sin código (ver 08-Arquitectura-ESP32.md)
 *.md (raíz) — documentación de arquitectura objetivo y backlog Scrum
 ```
 

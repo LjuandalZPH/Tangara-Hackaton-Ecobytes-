@@ -28,6 +28,7 @@
 | EPI-03 | Mapa por Sectores |
 | EPI-04 | Detalle de Sector (Historia) |
 | EPI-05 | Contenido Educativo |
+| EPI-06 | Kiosko ESP32 (planificado, sin código todavía) |
 
 ---
 
@@ -146,6 +147,25 @@
 | T-05.3 | Tarea | Verificar legibilidad y adaptabilidad de la pantalla en móvil con `responsive.dart`. | Baja | 1 | 2 | T-05.1, T-00.6 |
 
 **Subtotal: 4 SP**
+
+---
+
+## 📟 EPI-06 — Kiosko ESP32
+
+**Objetivo:** construir el firmware del kiosko físico documentado en [`08-Arquitectura-ESP32.md`](./08-Arquitectura-ESP32.md) — un ESP32-2432S028 (touch) que consume el mismo backend que el frontend Flutter, sin tocar su contrato. Épica nueva, **sin código todavía**; independiente de EPI-01 a EPI-05 (no bloquea ni depende de la limpieza del frontend Flutter), solo requiere que el contrato de los 5 endpoints (EPI-02) esté estable.
+
+| ID | Tipo | Descripción | Prioridad | SP | Sprint | Dependencias |
+| --- | --- | --- | --- | --- | --- | --- |
+| T-07.1 | Spike | Medir heap libre real (`ESP.getFreeHeap()`) parseando `GET /sectors` con el filtro de deserialización de ArduinoJson (descartando `geometry`). Bloqueante: confirma si el diseño de la Landing (§8 de `08-Arquitectura-ESP32.md`) es viable en la práctica. | Crítica | 2 | — | T-01.5 (contrato `/sectors` estable) |
+| T-07.2 | Tarea | Crear la estructura de proyecto PlatformIO en `Firmware/esp32-kiosko/`, con la config de LovyanGFX para ESP32-2432S028 (pantalla + touch resistivo). | Alta | 2 | — | — |
+| T-07.3 | Tarea | Pantalla de configuración táctil: escaneo WiFi + teclado para password + URL del backend, persistidos en NVS (`Preferences.h`); incluye calibración de touch de 4 puntos. | Alta | 3 | — | T-07.2 |
+| T-07.4 | Tarea | Pantalla Landing: `GET /sectors` filtrado (T-07.1), agregados de ciudad calculados client-side (PM2.5 promedio, conteo por estado) y lista scrolleable de los 22 sectores. | Alta | 3 | — | T-07.1, T-07.3 |
+| T-07.5 | Tarea | Pantalla Details — pestaña Resumen: indicadores actuales (`GET /sectors/{id}`) + gráfico de línea de `historial_24h` con `lv_chart`. | Alta | 2 | — | T-07.4 |
+| T-07.6 | Tarea | Pantalla Details — pestaña Historia: los 4 indicadores de texto de `GET /risk/{sector}` (sin gráfico — el endpoint no expone serie temporal, ver `08-Arquitectura-ESP32.md` §5.2), con aviso si `historico_suficiente: false`. | Media | 1 | — | T-07.4 |
+| T-07.7 | Tarea | Pantalla Details — pestaña Sensores: lista de `GET /sectors/{id}/sensores`. | Media | 1 | — | T-07.4 |
+| T-07.8 | Spike | Decidir sincronización de hora (NTP al conectar WiFi vs. timestamp crudo sin relativizar en v1) — ver advertencia en `08-Arquitectura-ESP32.md` §10. | Baja | 1 | — | T-07.3 |
+
+**Subtotal: 15 SP** (sin asignar a sprint todavía — pista independiente del roadmap web)
 
 ---
 

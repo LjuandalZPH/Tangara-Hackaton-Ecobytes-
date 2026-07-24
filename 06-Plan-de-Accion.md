@@ -179,7 +179,20 @@ Esto confirma que la cadena completa funciona: geohash de `tangara_plata` → `g
 
 ---
 
-## 5. Orden sugerido de alto nivel
+## 5. Kiosko ESP32 (planificado, sin código todavía)
+
+Nuevo módulo, independiente de todo lo anterior: un ESP32 con pantalla táctil
+que consume el mismo backend (mismos 5 endpoints, sin cambios de contrato).
+Diseño completo, presupuesto de memoria y advertencias técnicas en
+[`08-Arquitectura-ESP32.md`](./08-Arquitectura-ESP32.md); tareas concretas en
+`02-Backlog.md` (EPI-06). Primer paso bloqueante: un spike que mida heap libre
+real parseando `GET /sectors` con el filtro de ArduinoJson (descarta el campo
+`geometry`, que el ESP32 no necesita y pesa demasiado sin filtrar) — sin eso
+validado, el resto de las pantallas no tiene sentido construirlas.
+
+---
+
+## 6. Orden sugerido de alto nivel
 
 ```
 ✅ Decisión ClickHouse tomada (sección 1) — acceso confirmado
