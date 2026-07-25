@@ -161,11 +161,10 @@
 | T-07.3 | Tarea | Pantalla de configuración táctil: escaneo WiFi + teclado para password + URL del backend, persistidos en NVS (`Preferences.h`); incluye calibración de touch de 4 puntos. | Alta | 3 | — | T-07.2 |
 | T-07.4 | Tarea | Pantalla Landing: `GET /sectors` filtrado (T-07.1), agregados de ciudad calculados client-side (PM2.5 promedio, conteo por estado) y lista scrolleable de los 22 sectores. | Alta | 3 | — | T-07.1, T-07.3 |
 | T-07.5 | Tarea | Pantalla Details — pestaña Resumen: indicadores actuales (`GET /sectors/{id}`) + gráfico de línea de `historial_24h` con `lv_chart`. | Alta | 2 | — | T-07.4 |
-| T-07.6 | Tarea | Pantalla Details — pestaña Historia: los 4 indicadores de texto de `GET /risk/{sector}` (sin gráfico — el endpoint no expone serie temporal, ver `08-Arquitectura-ESP32.md` §5.2), con aviso si `historico_suficiente: false`. | Media | 1 | — | T-07.4 |
-| T-07.7 | Tarea | Pantalla Details — pestaña Sensores: lista de `GET /sectors/{id}/sensores`. | Media | 1 | — | T-07.4 |
-| T-07.8 | Spike | Decidir sincronización de hora (NTP al conectar WiFi vs. timestamp crudo sin relativizar en v1) — ver advertencia en `08-Arquitectura-ESP32.md` §10. | Baja | 1 | — | T-07.3 |
+| T-07.6 | Tarea | Pantalla Details — pestaña Historia: los 4 indicadores de texto de `GET /risk/{sector}` (sin gráfico — el endpoint no expone serie temporal, ver `08-Arquitectura-ESP32.md` §5.2), con aviso si `historico_suficiente: false`. Details queda en 2 pestañas — **sin pestaña Sensores** (decisión 2026-07-24, ver `08-Arquitectura-ESP32.md` §3: el kiosko no presenta datos de sensores individuales). | Media | 1 | — | T-07.4 |
+| T-07.8 | Tarea | Sincronización de hora por NTP al conectar WiFi (`configTime()`, zona `America/Bogota`), con fallback a timestamp crudo sin relativizar si falla (decidido 2026-07-24, ver `08-Arquitectura-ESP32.md` §10). | Media | 1 | — | T-07.3 |
 
-**Subtotal: 15 SP** (sin asignar a sprint todavía — pista independiente del roadmap web)
+**Subtotal: 14 SP** (sin asignar a sprint todavía — pista independiente del roadmap web)
 
 ---
 

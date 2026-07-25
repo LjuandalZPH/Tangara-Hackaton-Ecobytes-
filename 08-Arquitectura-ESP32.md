@@ -20,7 +20,7 @@ FastAPI ya existente (mismos 5 endpoints que consume el frontend Flutter, sin
 tocar el contrato), mostrando un flujo **Landing → Details**: la Landing lista
 los 22 sectores con un resumen agregado de ciudad, y al tocar uno se entra al
 Details de ese sector (indicadores actuales + gráfico de 24h + resumen de
-riesgo anual + lista de sensores).
+riesgo anual). **No se muestran datos de sensores individuales** — ver §3.
 
 ```
 ESP32-2432S028 (touch) ──HTTP/JSON──> FastAPI (mismo backend que Flutter) ──> ClickHouse
@@ -53,7 +53,9 @@ Display" (CYD)*. Specs relevantes para el diseño:
 | --- | --- | --- |
 | Selección de sector | **Selector en pantalla** (Landing lista los 22 sectores) | Sector fijo por dispositivo (kiosko de un solo sector) |
 | Config de red | **Portal de configuración táctil** (WiFiManager-style, guarda en NVS) | Credenciales hardcodeadas en firmware |
-| Alcance de "Historia" en Details | **Se incluyen los 4 indicadores** (promedio anual, peor mes, mejor mes, días sobre límite OMS) | Omitirlos y dejar solo Resumen + Sensores |
+| Alcance de "Historia" en Details | **Se incluyen los 4 indicadores** (promedio anual, peor mes, mejor mes, días sobre límite OMS) | Omitirlos y dejar solo Resumen |
+| Datos de sensores individuales (`GET /sectors/{id}/sensores`) | **No se muestran.** Details queda en 2 pestañas: Resumen + Historia | Pestaña "Sensores" (como en Flutter) con lista por sensor |
+| Reloj / hora relativa ("hace X min") | **NTP al conectar WiFi** | Mostrar el timestamp crudo del backend sin relativizar |
 
 ---
 
@@ -86,14 +88,18 @@ Si `Preferences` no tiene `wifi_ssid` guardado, el dispositivo abre directo la
 
 ### 4.2 Details (sector seleccionado)
 
-Un solo `lv_tabview` con 3 pestañas, calcadas del `sector_detail_page.dart` del
-frontend Flutter:
+Un solo `lv_tabview` con **2 pestañas** (Resumen + Historia — **sin pestaña
+Sensores**, decisión 2026-07-24: el kiosko no presenta datos de sensores
+individuales, ver §3), calcadas de las mismas pestañas de
+`sector_detail_page.dart` del frontend Flutter:
 
 **Pestaña Resumen** (`GET /sectors/{id}`):
 - 3 indicadores: PM2.5 (+ badge de estado), CO2, humedad.
 - Gráfico de línea de `historial_24h` con `lv_chart` (tipo `LV_CHART_TYPE_LINE`,
   hasta 24 puntos). Si `historial_24h` viene vacío, texto "Sin historial
   suficiente en las últimas 24h" en vez de gráfico — igual que hace hoy Flutter.
+- "Última lectura hace X" calculado con la hora real del dispositivo (NTP, ver
+  §10), mismo criterio que usa Flutter con `ultima_lectura`.
 
 **Pestaña Historia** (`GET /risk/{sector}`):
 - **No lleva gráfico** — el endpoint no serializa una serie temporal, solo
@@ -102,9 +108,8 @@ frontend Flutter:
   `historico_suficiente` es `false`, banner de aviso ("todavía no hay
   suficiente histórico para este sector").
 
-**Pestaña Sensores** (`GET /sectors/{id}/sensores`):
-- Lista de sensores del sector: nombre, PM2.5 + badge de estado, "última
-  lectura hace X" (o "sin lecturas recientes" si es `null`).
+> `GET /sectors/{id}/sensores` **no se consume desde el firmware** — es el
+> único de los 5 endpoints que el kiosko no usa. Ver §5.3.
 
 ---
 
@@ -142,10 +147,13 @@ puntos intermedios sin pedir un cambio de backend (fuera de alcance de este
 documento; si se quiere en el futuro, sería un 6º endpoint o extender este,
 igual que se hizo con `/sectors/{id}/sensores`).
 
-### 5.3 `GET /sectors/{id}/sensores` — snapshots puntuales, sin serie
+### 5.3 `GET /sectors/{id}/sensores` — no se usa desde el firmware
 
-Cada sensor trae su última hora agregada (`pm25_promedio`, `co2_promedio`,
-`hum_promedio`, `estado`), no histórico propio.
+El endpoint existe y el backend lo sigue exponiendo para el frontend Flutter
+(snapshots puntuales por sensor, sin histórico propio), pero el kiosko **no lo
+consume**: decisión 2026-07-24 de no presentar datos de sensores individuales
+en esta pantalla (ver §3). Queda documentado acá solo para que quede explícito
+que la omisión es deliberada, no un olvido.
 
 ---
 
@@ -218,8 +226,11 @@ antes de construir el resto de la UI encima.
 | `StaticJsonDocument` para `/sectors` (con filtro, sin `geometry`) | A medir — sin filtro es inviable (§8) | Bloqueante: validar antes de seguir |
 | `StaticJsonDocument` para `/sectors/{id}` (incluye `historial_24h`, 24 puntos) | ~2-3 KB | Liviano, sin riesgo |
 | `StaticJsonDocument` para `/risk/{sector}` | <1 KB | 4 valores + 2 sub-objetos pequeños |
-| `StaticJsonDocument` para `/sectors/{id}/sensores` | Depende de sensores por comuna (hoy máx. ~7 sensores en toda la red) | Bajo riesgo dado el bajo número real de sensores |
 | Stack WiFi/TLS + heap de red | ~40-60 KB mientras hay una request activa | No sostenido, solo durante el fetch |
+| Cliente NTP (`sntp`/`configTime`) | Despreciable | No mantiene buffer propio, solo ajusta el reloj interno del ESP32 |
+
+`GET /sectors/{id}/sensores` no aparece en esta tabla — el firmware no lo
+consume (ver §3, §5.3).
 
 **Siguiente paso técnico antes de escribir UI:** un spike mínimo que solo haga
 `GET /sectors` con el filtro de ArduinoJson y mida heap libre real
@@ -234,10 +245,14 @@ práctica y no solo en teoría.
   `Access-Control-Allow-Origin` que configurar, a diferencia de lo que exige
   `07-Integracion-Backend-Frontend.md` §2 para Flutter web. Sí hace falta que
   el backend sea alcanzable por IP dentro de la misma LAN (no `localhost`).
-- **Sin reloj de red (NTP) todavía no decidido.** Mostrar "hace X min" para
-  `ultima_lectura` (como hace Flutter) requiere que el ESP32 tenga la hora
-  actual. Falta decidir si se sincroniza por NTP al conectar WiFi o si se
-  muestra el timestamp crudo del backend sin relativizar en v1.
+- **Reloj de red: NTP al conectar WiFi (decidido 2026-07-24).** Tras conectar
+  a la red configurada en el portal (§4.0), el firmware sincroniza la hora vía
+  NTP (`configTime()`/`sntp`, servidor por defecto `pool.ntp.org`, con la zona
+  horaria de Cali `America/Bogota`, UTC-5 sin horario de verano) antes de
+  mostrar Landing. Con eso, "última lectura hace X min" para `ultima_lectura`
+  se calcula igual que en Flutter. Si la sincronización falla (sin salida a
+  internet, solo LAN local), se degrada mostrando el timestamp crudo del
+  backend sin relativizar, en vez de bloquear la pantalla.
 - **`historico_suficiente: false` es un caso real y frecuente.** Con solo 7 de
   22 comunas con sensores propios, varios sectores van a mostrar el banner de
   "histórico insuficiente" en la pestaña Historia — no es un bug de la UI.
@@ -253,6 +268,6 @@ práctica y no solo en teoría.
 - [ ] Spike de memoria de §9 (bloqueante para todo lo demás).
 - [ ] Estructura de proyecto PlatformIO (`Firmware/esp32-kiosko/`).
 - [ ] Pantalla de configuración táctil (WiFi + URL backend + calibración touch).
+- [ ] Sincronización NTP tras conectar WiFi, con fallback a timestamp crudo (ver §10).
 - [ ] Pantalla Landing (lista de sectores + agregados de ciudad).
-- [ ] Pantalla Details (3 pestañas).
-- [ ] Decisión de NTP (ver §10).
+- [ ] Pantalla Details (2 pestañas: Resumen + Historia — sin Sensores).

@@ -42,7 +42,7 @@ El alcance está pensado para demostrar el valor central del producto con el men
 
 [ ESP32 KIOSKO — planificado, sin código todavía (ver 08-Arquitectura-ESP32.md) ]
   Mismo backend, mismos 5 endpoints, como segundo cliente HTTP
-  └── Landing (resumen de ciudad + selector de sector) → Detalle (Resumen/Historia/Sensores)
+  └── Landing (resumen de ciudad + selector de sector) → Detalle (Resumen/Historia, sin Sensores)
 ```
 
 **Principio de diseño:** un solo servicio backend sin estado propio (stateless), sin base de datos propia más allá del GeoJSON estático que vive en el repositorio. Toda la persistencia real de series de tiempo ya existe en ClickHouse — EcoBytes es una capa de consulta y presentación sobre ella, no un sistema nuevo de almacenamiento. El frontend, por su parte, es una única base de código Flutter con la web como target principal de despliegue (ver `04-Arquitectura-Frontend.md` §1 — las carpetas nativas se conservan para builds a demanda, no se despliegan).
