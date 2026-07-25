@@ -49,16 +49,34 @@ Firmware/esp32-kiosko/ — planificado, todavía sin código (ver 08-Arquitectur
 *.md (raíz) — documentación de arquitectura objetivo y backlog Scrum
 ```
 
+## Variables de entorno (`.env`)
+
+Hay **dos archivos `.env` distintos, con propósitos distintos**, cada uno dentro de la carpeta del servicio al que pertenece — no confundirlos:
+
+| Archivo | Contiene | Lo consume | Usado por |
+| --- | --- | --- | --- |
+| `Frontend/ecobytes/.env` | `API_BASE_URL` — la URL donde el **navegador del cliente** puede alcanzar al backend | El build del servicio `web` (queda compilada dentro del bundle JS vía `--dart-define`, no es una variable de runtime) | `docker-compose.yml`, `docker-compose.frontend.yml`, pasado explícitamente con `--env-file Frontend/ecobytes/.env` (no está en el mismo directorio que los `.yml`, así que Docker Compose no lo autodetecta) |
+| `Backend/.env` | Credenciales `CLICKHOUSE_*` y `CORS_ORIGINS` | `config.py` (pydantic-settings), en runtime | `docker-compose.yml`, `docker-compose.backend.yml` (vía `env_file`, sí autodetectado por estar declarado explícitamente) |
+
+Ambos archivos tienen su `.env.example` correspondiente (`Frontend/ecobytes/.env.example` y `Backend/.env.example`) — ninguno de los dos `.env` va al repo (están en `.gitignore`).
+
+Al desplegar backend y frontend en servidores distintos, `API_BASE_URL` (`Frontend/ecobytes/.env`) y `CORS_ORIGINS` (`Backend/.env`) tienen que coincidir exactamente en protocolo+host+puerto — uno apunta al otro en direcciones opuestas. Ver `07-Integracion-Backend-Frontend.md` para el detalle del flujo CORS.
+
 ## Backend (`Backend/`)
 
 ### Comandos
 
 ```bash
-# Levantar la API con hot-reload (único servicio, no hay base de datos que levantar)
-docker compose up
+# Levantar la app completa (api + web) con hot-reload en el backend
+# --env-file es necesario porque Frontend/ecobytes/.env no está en la
+# raíz del repo (ver sección "Variables de entorno" arriba)
+docker compose --env-file Frontend/ecobytes/.env up
 
 # Levantar solo el backend, sin el frontend (compose alterno, mismo servicio "api")
 docker compose -f docker-compose.backend.yml up
+
+# Levantar solo el frontend, sin el backend (compose alterno, mismo servicio "web")
+docker compose --env-file Frontend/ecobytes/.env -f docker-compose.frontend.yml up
 
 # Desarrollo local sin Docker
 cd Backend
