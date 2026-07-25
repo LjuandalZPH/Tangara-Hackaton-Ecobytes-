@@ -57,6 +57,9 @@ Firmware/esp32-kiosko/ — planificado, todavía sin código (ver 08-Arquitectur
 # Levantar la API con hot-reload (único servicio, no hay base de datos que levantar)
 docker compose up
 
+# Levantar solo el backend, sin el frontend (compose alterno, mismo servicio "api")
+docker compose -f docker-compose.backend.yml up
+
 # Desarrollo local sin Docker
 cd Backend
 pip install -r requirements.txt

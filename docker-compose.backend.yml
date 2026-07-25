@@ -1,0 +1,21 @@
+services:
+
+  # ─────────────────────────────────────────
+  # BACKEND — FastAPI
+  # Sin base de datos propia: lee directamente de ClickHouse
+  # (tangara_plata), ver Backend/.env para las credenciales.
+  # Compose alterno: solo levanta el backend, sin el frontend.
+  # ─────────────────────────────────────────
+  api:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: ecobytes_api
+    restart: unless-stopped
+    env_file:
+      - ./Backend/.env
+    ports:
+      - "8000:8000"         # http://localhost:8000
+    volumes:
+      - ./Backend:/app      # hot-reload: cambios en el código se reflejan sin reconstruir
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
