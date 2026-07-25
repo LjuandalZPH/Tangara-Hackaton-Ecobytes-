@@ -165,7 +165,9 @@ Inicio | Mapa | Aprende | Chatbot
 
 El detalle de sector (§6) se alcanza únicamente desde el mapa — no aparece como ítem de navegación propio.
 
-**Decisión (2026-07-23):** landing y chatbot se conservan como parte de la navegación principal — respaldados por el Figma del equipo, no son scaffold heredado. El chatbot mantiene su lugar en el producto (nav + pantalla propia), pero su implementación real (conexión a un backend/LLM) está en pausa hasta que un miembro del equipo la retome — no se está tocando ese alcance ni ese código por ahora. Ver `05-Discrepancias.md`.
+**Decisión (2026-07-23):** landing y chatbot se conservan como parte de la navegación principal — respaldados por el Figma del equipo, no son scaffold heredado.
+
+**Actualización (2026-07-25): la pausa del chatbot terminó del lado backend.** `POST /chatbot` ya existe y funciona (ver `03-Arquitectura-Backend.md` §3): recibe `{mensaje, historial}` y devuelve `{respuesta, acciones, contexto_actualizado}`. **Falta el lado Flutter**, que sigue siendo la maqueta con mensajes hardcodeados: crear la capa `data/` + `ChatbotProvider` (mismo patrón que `SectorsProvider`), cablear el botón "Enviar", pintar los botones de `acciones` (llegan de una lista cerrada que esta pantalla ya sabe dibujar), y derivar el badge "Fuera de línea" del `503` que devuelve el endpoint cuando el servidor no tiene `OPENAI_API_KEY`, en vez de tenerlo fijo. Ver `05-Discrepancias.md`.
 
 ---
 

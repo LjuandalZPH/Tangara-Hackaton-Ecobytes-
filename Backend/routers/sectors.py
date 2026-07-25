@@ -5,96 +5,15 @@ GET /sectors/{id}        — detalle (pm25, co2, hum, timestamp) de un sector.
 GET /sectors/{id}/sensores — sensores individuales dentro de un sector.
 """
 
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, HTTPException, Request
 
-from config import (
-    HORAS_HISTORIAL_SECTOR,
-    MAX_ANTIGUEDAD_LECTURA_SEGUNDOS,
-    PM25_UMBRAL_BUENO,
-    PM25_UMBRAL_MODERADO,
-)
+from config import HORAS_HISTORIAL_SECTOR
 from services import clickhouse_client
 from services.cache import sectors_cache
 from services.geo import obtener_mapeo_sensor_sector
+from services.sectores import construir_sectores, es_reciente, estado_por_pm25
 
 router = APIRouter()
-
-
-def _estado_por_pm25(pm25: float | None) -> str:
-    """
-    Clasifica el estado según umbrales OMS de PM2.5 (ver config.py):
-    verde (bueno) / amarillo (moderado) / rojo (dañino).
-    """
-    if pm25 is None:
-        return "gris"
-    if pm25 < PM25_UMBRAL_BUENO:
-        return "verde"
-    if pm25 <= PM25_UMBRAL_MODERADO:
-        return "amarillo"
-    return "rojo"
-
-
-def _es_reciente(ultima_lectura) -> bool:
-    if ultima_lectura is None:
-        return False
-    if ultima_lectura.tzinfo is None:
-        ultima_lectura = ultima_lectura.replace(tzinfo=timezone.utc)
-    antiguedad = (datetime.now(timezone.utc) - ultima_lectura).total_seconds()
-    return antiguedad <= MAX_ANTIGUEDAD_LECTURA_SEGUNDOS
-
-
-async def _construir_sectores(request: Request) -> list[dict]:
-    sector_index = request.app.state.sector_index
-    mapeo_sensor_sector = await obtener_mapeo_sensor_sector(sector_index)
-
-    lecturas = await clickhouse_client.ultimo_promedio_por_sensor()
-
-    # Agrupa las lecturas de sensores por sector
-    por_sector: dict[str, list[dict]] = {}
-    for lectura in lecturas:
-        sector_id = mapeo_sensor_sector.get(lectura["name"])
-        if sector_id is None:
-            continue
-        por_sector.setdefault(sector_id, []).append(lectura)
-
-    sectores_respuesta = []
-    for sector in sector_index.sectores:
-        lecturas_sector = por_sector.get(sector["id"], [])
-
-        if not lecturas_sector:
-            sectores_respuesta.append(
-                {
-                    "id": sector["id"],
-                    "nombre": sector["nombre"],
-                    "geometry": sector["geometry"],
-                    "pm25_promedio": None,
-                    "estado": "gris",
-                    "ultima_lectura": None,
-                    "sin_datos_recientes": True,
-                }
-            )
-            continue
-
-        pm25_valores = [l["pm25_promedio"] for l in lecturas_sector if l["pm25_promedio"] is not None]
-        pm25_promedio = sum(pm25_valores) / len(pm25_valores) if pm25_valores else None
-        ultima_lectura = max(l["ultima_lectura"] for l in lecturas_sector)
-        reciente = _es_reciente(ultima_lectura)
-
-        sectores_respuesta.append(
-            {
-                "id": sector["id"],
-                "nombre": sector["nombre"],
-                "geometry": sector["geometry"],
-                "pm25_promedio": pm25_promedio,
-                "estado": _estado_por_pm25(pm25_promedio) if reciente else "gris",
-                "ultima_lectura": ultima_lectura,
-                "sin_datos_recientes": not reciente,
-            }
-        )
-
-    return sectores_respuesta
 
 
 @router.get("")
@@ -104,7 +23,7 @@ async def get_sectors(request: Request):
     if cacheado is not None:
         return cacheado
 
-    sectores = await _construir_sectores(request)
+    sectores = await construir_sectores(request.app.state.sector_index)
     respuesta = {"sectores": sectores}
     sectors_cache["sectores"] = respuesta
     return respuesta
@@ -154,7 +73,7 @@ async def get_sector_detail(sector_id: str, request: Request):
 
     pm25_promedio = _promedio("pm25_promedio")
     ultima_lectura = max(l["ultima_lectura"] for l in lecturas_sector)
-    reciente = _es_reciente(ultima_lectura)
+    reciente = es_reciente(ultima_lectura)
 
     return {
         "id": sector["id"],
@@ -164,7 +83,7 @@ async def get_sector_detail(sector_id: str, request: Request):
         "hum_promedio": _promedio("hum_promedio"),
         "ultima_lectura": ultima_lectura,
         "sin_datos_recientes": not reciente,
-        "estado": _estado_por_pm25(pm25_promedio) if reciente else "gris",
+        "estado": estado_por_pm25(pm25_promedio) if reciente else "gris",
         "historial_24h": historial_24h,
     }
 
@@ -211,7 +130,7 @@ async def get_sector_sensores(sector_id: str, request: Request):
             )
             continue
 
-        reciente = _es_reciente(lectura["ultima_lectura"])
+        reciente = es_reciente(lectura["ultima_lectura"])
         coords = lectura.get("coords") or {}
         sensores_respuesta.append(
             {
@@ -222,7 +141,7 @@ async def get_sector_sensores(sector_id: str, request: Request):
                 "co2_promedio": lectura["co2_promedio"],
                 "hum_promedio": lectura["hum_promedio"],
                 "ultima_lectura": lectura["ultima_lectura"],
-                "estado": _estado_por_pm25(lectura["pm25_promedio"]) if reciente else "gris",
+                "estado": estado_por_pm25(lectura["pm25_promedio"]) if reciente else "gris",
                 "sin_datos_recientes": not reciente,
             }
         )

@@ -27,6 +27,14 @@ class Settings(BaseSettings):
 
     environment: str = "development"
 
+    # ── Chatbot (OpenAI) ──
+    # Sin openai_api_key el endpoint POST /chatbot responde 503 (ver
+    # routers/chatbot.py); el resto de la API sigue funcionando igual,
+    # así que esta ausencia no debe tumbar el arranque de la app.
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    openai_timeout_segundos: float = 30.0
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
@@ -62,3 +70,29 @@ MIN_MESES_HISTORICO_SUFICIENTE = 3
 # Ventana del historial horario ("Evolución de la calidad del aire") que
 # devuelve GET /sectors/{id}
 HORAS_HISTORIAL_SECTOR = 24
+
+# ─────────────────────────────────────────────────────────────
+# Chatbot (POST /chatbot)
+# ─────────────────────────────────────────────────────────────
+# TTL del snapshot de contexto (services/chatbot_context.py) que se le
+# inyecta al modelo. Corto para que el chatbot no diga datos desfasados,
+# pero suficiente para no reconstruirlo en cada mensaje del usuario.
+TTL_CONTEXTO_CHATBOT_SEGUNDOS = 60
+
+# Cuántos turnos de historial (usuario+asistente) se conservan como
+# máximo; el resto se recorta en el servidor, nunca se rechaza la request.
+MAX_TURNOS_HISTORIAL_CHATBOT = 10
+
+# Longitud máxima del mensaje del usuario en POST /chatbot
+MAX_LONGITUD_MENSAJE_CHATBOT = 1000
+
+# Lista cerrada de botones/acciones que el modelo puede sugerir a la UI.
+# El frontend (chatbot_page.dart) ya sabe pintar botones con estos textos
+# exactos; cualquier otra acción que devuelva el modelo se filtra en el
+# servidor antes de responder (services/llm_client.py).
+ACCIONES_CHATBOT = [
+    "Ver mapa de Cali",
+    "Recomendación de hoy",
+    "Comparar comunas",
+    "Aprender sobre PM2.5",
+]

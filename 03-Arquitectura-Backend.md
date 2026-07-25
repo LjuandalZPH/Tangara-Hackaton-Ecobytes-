@@ -26,10 +26,14 @@ backend/
 ├── routers/
 │   ├── sectors.py              # GET /sectors, GET /sectors/{id}, GET /sectors/{id}/sensores
 │   ├── risk.py                 # GET /risk/{sector}
-│   └── education.py            # GET /education
+│   ├── education.py            # GET /education
+│   └── chatbot.py              # POST /chatbot
 ├── services/
 │   ├── clickhouse_client.py    # Cliente async, queries + agregación sobre tangara_plata
 │   ├── geo.py                  # Carga de GeoJSON + point-in-polygon (shapely)
+│   ├── sectores.py             # Snapshot de las 22 comunas (compartido por sectors.py y el chatbot)
+│   ├── chatbot_context.py      # Snapshot de datos reales que alimenta el prompt del LLM
+│   ├── llm_client.py           # Cliente async de OpenAI + system prompt
 │   └── cache.py                # Cache en memoria con TTL corto (ej. cachetools)
 ├── data/
 │   ├── sectores.geojson        # Polígonos de comunas/barrios de Cali
@@ -136,6 +140,50 @@ Si el sector tiene menos de un umbral mínimo de datos históricos (ej. menos de
 ### `GET /education`
 Devuelve el contenido estático de `data/educacion.json`. No requiere lógica adicional — es deliberadamente el endpoint más simple del sistema.
 
+### `POST /chatbot`
+**Agregado el 2026-07-25.** Asistente ambiental conversacional para la pantalla `/chatbot` del frontend. Es el **único endpoint que no es de solo lectura sobre ClickHouse** (llama a un proveedor externo, OpenAI) y el único `POST` del contrato.
+
+**Request:**
+```json
+{
+  "mensaje": "¿Es seguro trotar en la Comuna 17 ahora?",
+  "historial": [
+    { "rol": "usuario", "texto": "¿Cómo está el aire hoy?" },
+    { "rol": "asistente", "texto": "El promedio de Cali está en 1.9 µg/m³..." }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "respuesta": "La Comuna 17 está en verde (0.6 µg/m³), muy por debajo del límite OMS...",
+  "acciones": ["Ver mapa de Cali", "Comparar comunas"],
+  "contexto_actualizado": "2026-07-25T14:03:11.482Z"
+}
+```
+
+**El servidor no guarda estado de conversación:** el `historial` viaja completo en cada request y se recorta a los últimos `MAX_TURNOS_HISTORIAL_CHATBOT` (10) turnos en el servidor, nunca se rechaza por ser largo. `mensaje` está acotado a `MAX_LONGITUD_MENSAJE_CHATBOT` (1000) caracteres.
+
+`acciones` son botones sugeridos para la UI, elegidos por el modelo de una **lista cerrada** (`ACCIONES_CHATBOT` en `config.py`) que el frontend ya sabe pintar. Se restringen dos veces: por el `json_schema` estricto que se le pasa a OpenAI, y por un filtro en el servidor que descarta cualquier valor fuera de la lista — el schema acota el formato, no la honestidad del modelo.
+
+**El modelo no sabe nada por su cuenta.** Todo lo que puede afirmar sale del snapshot que construye `services/chatbot_context.py`: las 22 comunas con su PM2.5 y estado (los mismos datos del mapa, vía `services/sectores.py`), los agregados de ciudad ya calculados (promedio, mejor y peor comuna, cuántas están en gris), los umbrales OMS y el contenido de `data/educacion.json`. Se descarta `geometry` a propósito: el GeoJSON pesa cientos de KB y al modelo no le sirve. El snapshot se cachea 60s (`TTL_CONTEXTO_CHATBOT_SEGUNDOS`) y pesa ~5 KB (~1.2k tokens).
+
+**Códigos de error:**
+
+| Código | Cuándo |
+| --- | --- |
+| `422` | `mensaje` vacío o >1000 caracteres, o un `rol` distinto de `usuario`/`asistente` |
+| `503` | No hay `OPENAI_API_KEY` configurada. El chatbot es **opcional**: sin key este endpoint responde 503 con un mensaje claro y el resto de la API funciona con normalidad (el frontend ya tiene un badge "Fuera de línea" para este caso) |
+| `502` | Fallo o timeout del proveedor. El error real se loguea en el servidor y **nunca** viaja al cliente: puede traer detalles de la cuenta o de la key |
+
+**Si ClickHouse falla, el endpoint no se cae: se degrada.** El snapshot se marca con `datos_sensores_disponibles: false` y el modelo dice honestamente que no hay cifras que reportar, en vez de devolver un error. Ese contexto degradado no se cachea, para que el siguiente mensaje reintente.
+
+**Dos riesgos conocidos y aceptados** (revisados el 2026-07-25, no son omisiones):
+
+1. **Sin rate limiting.** La API es de acceso abierto por decisión de arquitectura (§1), pero `/chatbot` es el único endpoint con **coste monetario directo** por request: cualquiera con la URL puede consumir la cuota de OpenAI. Está acotado *por request* (1000 caracteres, 10 turnos de historial, `gpt-4o-mini`), no *por cliente*. Si esto se despliega públicamente más allá de la demo, lo mínimo sería un throttle por IP reusando el patrón de `TTLCache` de `services/cache.py` — con la salvedad de que detrás de un proxy todas las IPs pueden verse iguales si no se lee `X-Forwarded-For`.
+2. **El `historial` lo controla el cliente.** Viaja completo en cada request y se inyecta como turnos `user`/`assistant`, así que un atacante puede fabricar turnos previos del propio asistente para intentar debilitar las reglas del system prompt. Es prompt injection de manual. Se acepta para el alcance actual: no hay memoria de servidor que contaminar, no hay datos privados que extraer (todo el contexto es público y ya lo expone `GET /sectors`), y el system prompt pesa más que el historial. No se acepta si algún día el chatbot gana herramientas con efectos secundarios.
+
 ---
 
 ## 4. Consultas a ClickHouse — patrones clave
@@ -237,11 +285,19 @@ CLICKHOUSE_DATABASE=tangara_plata
 CLICKHOUSE_SECURE=True
 ```
 
+Más las del chatbot (2026-07-25). Las tres son opcionales: sin `OPENAI_API_KEY`, `POST /chatbot` responde 503 y el resto del servicio arranca y funciona igual.
+
+```bash
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TIMEOUT_SEGUNDOS=30
+```
+
 ---
 
 ## 7. Contrato de API con el frontend
 
-Estos cinco endpoints son el contrato completo entre backend y frontend. El equipo de Flutter puede construir su capa de datos (modelos, cliente HTTP) directamente contra estas respuestas sin esperar a que el backend esté 100% desplegado — basta con fijar el contrato temprano y, si hace falta, levantar un servidor de datos de prueba con estas mismas formas de respuesta.
+Estos seis endpoints son el contrato completo entre backend y frontend. El equipo de Flutter puede construir su capa de datos (modelos, cliente HTTP) directamente contra estas respuestas sin esperar a que el backend esté 100% desplegado — basta con fijar el contrato temprano y, si hace falta, levantar un servidor de datos de prueba con estas mismas formas de respuesta.
 
 ---
 
@@ -249,6 +305,8 @@ Estos cinco endpoints son el contrato completo entre backend y frontend. El equi
 
 - Endpoints documentados automáticamente en Swagger (`/docs`).
 - Ninguna query del backend toca `tangara_bronce` directamente — solo `tangara_plata`, agregando en el propio backend.
+- El chatbot nunca afirma cifras que no vengan del snapshot de `services/chatbot_context.py`, y nunca presenta `gris` como "aire limpio" (ver §3, `POST /chatbot`).
+- Falta de `OPENAI_API_KEY` degrada solo el chatbot (503), nunca el arranque del servicio ni los otros cinco endpoints.
 - Todo endpoint responde en menos de 1s con caché tibia.
 - `sectores.geojson` versionado en el repo; cualquier cambio a los polígonos pasa por PR.
 - `requirements.txt` contiene únicamente las dependencias necesarias para el alcance actual del servicio.
