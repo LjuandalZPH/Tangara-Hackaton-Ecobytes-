@@ -6,50 +6,51 @@ import '../../../../core/utils/responsive.dart';
 
 import '../../../../shared/widgets/status_badge.dart'; //Aquí dentro viven EcoCard, StatusBadge y SectionLabel
 
-import '../../../landing/presentation/widgets/landing_footer.dart';
-import '../../../landing/presentation/widgets/landing_header.dart';
+import '../../../../shared/widgets/landing_footer.dart';
+import '../../../../shared/widgets/landing_header.dart';
 
 // --- ESTRUCTURAS DE DATOS (RECORDS) ---
+//
+// Los umbrales de PM2.5 y los 4 estados de calidad del aire deben coincidir
+// con los que usa el resto de la app (Backend/config.py: PM25_UMBRAL_BUENO=15,
+// PM25_UMBRAL_MODERADO=35; EstadoSectorX en sector.dart) — este contenido es
+// educativo, pero no puede enseñar una escala distinta a la que el mapa y el
+// detalle de sector realmente usan. No se incluye O3: el backend no lo mide
+// en ningún endpoint (`Sector`/`SectorDetalle` solo traen PM2.5, CO2 y humedad).
 
 const _contaminantes = <(String, String, String, String)>[
   (
     'PM2.5',
     'Partículas finas',
     'Partículas diminutas de polvo, humo y hollín que penetran hasta los pulmones y el torrente sanguíneo. Provienen del tráfico, la quema de biomasa y la industria.',
-    '0–12 saludable',
+    '<15 µg/m³ bueno (OMS)',
   ),
   (
     'CO2',
     'Dióxido de carbono',
     'Gas producido por la combustión de vehículos e industrias. En espacios abiertos se dispersa, pero niveles altos sostenidos indican poca ventilación o tráfico denso.',
-    '<800 saludable',
-  ),
-  (
-    'O3',
-    'Ozono troposférico',
-    'Se forma cuando la luz solar reacciona con contaminantes del tráfico. Aumenta en las horas de más sol y puede irritar las vías respiratorias.',
-    '<70 saludable',
+    '<800 ppm, referencia general',
   ),
   (
     'HR',
     'Humedad relativa',
     'No es un contaminante, pero influye en cómo se sienten y dispersan las partículas en el aire. Útil para interpretar el resto de las métricas.',
-    '30-60 ideal',
+    '30-60% ideal',
   ),
 ];
 
-const _nivelesAqi = <(Color, String, String, String)>[
-  (Color(0xFF81C784), '0-50', 'Bueno', 'El aire no representa riesgo. Ideal para actividades al aire libre sin restricciones.'),
-  (Color(0xFFFFB74D), '51-100', 'Moderado', 'Aceptable para la mayoría. Grupos sensibles podrían notar síntomas leves.'),
-  (Color(0xFFFF8A65), '101-150', 'Dañino para sensibles', 'Niños, adultos mayores y personas con afecciones respiratorias deben reducir el esfuerzo prolongado al aire libre.'),
-  (Color(0xFFE57373), '151+', 'Dañino', 'Toda la población puede verse afectada. Se recomienda evitar actividad física intensa al aire libre.'),
+const _nivelesCalidad = <(Color, String, String, String)>[
+  (AppColors.statusGood, 'Verde', 'Buena', 'PM2.5 por debajo de 15 µg/m³. Ideal para actividades al aire libre sin restricciones.'),
+  (AppColors.statusModerate, 'Amarillo', 'Moderada', 'PM2.5 entre 15 y 35 µg/m³. Aceptable para la mayoría; grupos sensibles podrían notar síntomas leves.'),
+  (AppColors.statusBad, 'Rojo', 'Dañina', 'PM2.5 por encima de 35 µg/m³. Se recomienda evitar actividad física intensa al aire libre.'),
+  (AppColors.textMuted, 'Gris', 'Sin datos', 'El sector no tiene sensores cercanos, o su última lectura es demasiado antigua para considerarse confiable.'),
 ];
 
 const _recomendaciones = <(String, String, String)>[
   (
     '🏃‍♂️',
     'Población general',
-    'Con AQI moderado puedes hacer ejercicio al aire libre con normalidad. Evita las horas pico de tráfico (7–9am y 5–7pm) si vives cerca de avenidas principales.',
+    'Con calidad del aire moderada (amarillo) puedes hacer ejercicio al aire libre con normalidad. Evita las horas pico de tráfico (7–9am y 5–7pm) si vives cerca de avenidas principales.',
   ),
   (
     '👶',
@@ -59,12 +60,12 @@ const _recomendaciones = <(String, String, String)>[
   (
     '🫁',
     'Personas con asma o EPOC',
-    'Lleva siempre tu inhalador de rescate. Si el AQI supera 100, considera mover el ejercicio a interiores o a primera hora de la mañana.',
+    'Lleva siempre tu inhalador de rescate. Si la calidad del aire está en rojo, considera mover el ejercicio a interiores o a primera hora de la mañana.',
   ),
   (
     '👵',
     'Adultos mayores',
-    'Revisa el AQI antes de salir a caminar. Prefiere paseos cortos en horarios de menor contaminación, generalmente temprano en la mañana.',
+    'Revisa el estado de calidad del aire antes de salir a caminar. Prefiere paseos cortos en horarios de menor contaminación, generalmente temprano en la mañana.',
   ),
 ];
 
@@ -97,7 +98,7 @@ class _LearnPageState extends State<LearnPage> {
                     
                     const _HeroSection(),
                     const _QueMedimosSection(),
-                    const _AqiLevelsSection(),
+                    const _NivelesCalidadSection(),
                     const _RecomendacionesSection(),
                     const LandingFooter(),
                   ],
@@ -138,7 +139,7 @@ class _HeroSection extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              'Una guía sencilla sobre los contaminantes que medimos, qué significa el índice AQI y cómo proteger tu salud según la calidad del aire del día.',
+              'Una guía sencilla sobre los contaminantes que medimos, qué significa cada estado de calidad del aire (verde, amarillo, rojo) y cómo proteger tu salud según la calidad del aire del día.',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: AppColors.textMuted,
                     fontSize: 16,
@@ -178,7 +179,7 @@ class _QueMedimosSection extends StatelessWidget {
             LayoutBuilder(
               builder: (context, constraints) {
                 final isMobile = context.isMobile;
-                final columns = isMobile ? 1 : 4;
+                final columns = isMobile ? 1 : 3;
                 final itemWidth = (constraints.maxWidth - (columns - 1) * AppSpacing.lg) / columns;
 
                 return Wrap(
@@ -242,8 +243,8 @@ class _QueMedimosSection extends StatelessWidget {
   }
 }
 
-class _AqiLevelsSection extends StatelessWidget {
-  const _AqiLevelsSection();
+class _NivelesCalidadSection extends StatelessWidget {
+  const _NivelesCalidadSection();
 
   @override
   Widget build(BuildContext context) {
@@ -258,10 +259,10 @@ class _AqiLevelsSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionLabel(text: 'ÍNDICE AQI'),
+            const SectionLabel(text: 'CALIDAD DEL AIRE'),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Qué significa cada nivel',
+              'Qué significa cada estado',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontSize: 24,
@@ -277,7 +278,7 @@ class _AqiLevelsSection extends StatelessWidget {
                 return Wrap(
                   spacing: AppSpacing.lg,
                   runSpacing: AppSpacing.lg,
-                  children: _nivelesAqi.map((level) {
+                  children: _nivelesCalidad.map((level) {
                     return SizedBox(
                       width: itemWidth,
                       child: EcoCard(

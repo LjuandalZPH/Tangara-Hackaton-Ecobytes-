@@ -18,3 +18,22 @@ services:
     volumes:
       - ./Backend:/app      # hot-reload: cambios en el código se reflejan sin reconstruir
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ─────────────────────────────────────────
+  # FRONTEND — Flutter web (build estático servido por nginx)
+  # API_BASE_URL debe apuntar a donde el navegador del cliente pueda
+  # alcanzar al backend (ej. http://<IP-del-servidor>:8000), no a
+  # localhost salvo que accedas desde la misma máquina.
+  # ─────────────────────────────────────────
+  web:
+    build:
+      context: ./Frontend/ecobytes
+      dockerfile: Dockerfile
+      args:
+        API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+    container_name: ecobytes_web
+    restart: unless-stopped
+    ports:
+      - "8080:80"           # http://localhost:8080
+    depends_on:
+      - api

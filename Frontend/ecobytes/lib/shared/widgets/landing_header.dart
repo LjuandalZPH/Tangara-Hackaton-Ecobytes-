@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_spacing.dart';
-import '../../../../core/router/app_router.dart';
-import '../../../../core/utils/responsive.dart';
-import '../../../../shared/widgets/eco_bytes_logo.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_spacing.dart';
+import '../../core/router/app_router.dart';
+import '../../core/utils/responsive.dart';
+import 'eco_bytes_logo.dart';
 
 const landingNavLinks = <(String, String)>[
   ('Inicio', AppRoutes.landing),

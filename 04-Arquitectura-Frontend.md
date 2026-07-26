@@ -1,18 +1,18 @@
 # 📱 Arquitectura Frontend — EcoBytes
 
-**Stack:** Flutter (Dart) · Compilado exclusivamente a web · Diseño responsive
+**Stack:** Flutter (Dart) · Web como target principal, con soporte nativo (Android/iOS/desktop) conservado desde el mismo código fuente · Diseño responsive
 
-> Tres pantallas, pensadas para verse bien tanto en desktop como en teléfono desde el navegador. No hay build nativo de Android/iOS — el acceso móvil se resuelve con diseño responsive dentro de la misma app web.
+> La navegación principal replica el [Figma del equipo](https://www.figma.com/design/DdGdcWdvPtcSdZ7mRRzXW9/EcoBytes-%E2%80%94-Landing-Page): Landing (`/`), Mapa (`/mapa`), Aprende (`/aprende`) y Chatbot (`/chatbot`). Desde el mapa, cada sector abre una pantalla de **detalle de sector** (pestañas Resumen / Historia / Sensores — pantalla "Detalle de Producto" del Figma) que no es parte de la navegación principal, sino un sub-flujo del mapa. **Actualización (2026-07-23): donde este documento y el Figma choquen, gana el Figma** — varias secciones de abajo asumían un alcance reducido (sin landing, sin chatbot, con una pantalla "Riesgo por Dirección" separada) que no coincide con el diseño real del equipo.
 
 ---
 
 ## 1. Principios de diseño
 
-1. **Solo web.** Un único target de compilación (`flutter build web`). Sin carpetas `android/`, `ios/`, `macos/`, `linux/`, `windows/` en el repositorio — si existen, se eliminan.
+1. **Web como target principal.** `flutter build web` es el build que se despliega en producción. Las carpetas `android/`, `ios/`, `macos/`, `linux/`, `windows/` se mantienen versionadas en el repositorio para permitir compilar builds nativos (ej. un APK de Android) a demanda, aunque hoy no formen parte del pipeline de despliegue.
 2. **Acceso abierto.** No hay pantalla de login ni estado de sesión que propagar por el árbol de widgets — cualquier persona entra y usa la app directamente.
 3. **Polling para datos frescos.** El mapa se refresca llamando al backend cada 30-60 segundos con un `Timer.periodic`, sin conexión persistente.
-4. **Gestión de estado simple.** `Provider` (o `ChangeNotifier` directo) es suficiente para tres pantallas sin lógica de negocio compleja — se evita la ceremonia de definir eventos y estados por feature que solo se justifica en apps más grandes.
-5. **Tres módulos, cero dependencias cruzadas obligatorias.** Cada módulo puede desarrollarse y probarse en paralelo por distintas personas del equipo, igual que en el backlog.
+4. **Gestión de estado simple.** `Provider` (o `ChangeNotifier` directo) es suficiente para el número de pantallas del producto — se evita la ceremonia de definir eventos y estados por feature que solo se justifica en apps más grandes.
+5. **Módulos con pocas dependencias cruzadas.** Landing, mapa, aprende y chatbot pueden desarrollarse y probarse en paralelo por distintas personas del equipo. El detalle de sector depende del mapa (necesita un sector seleccionado), pero no de las demás.
 
 ---
 
@@ -20,7 +20,7 @@
 
 | Herramienta | Propósito |
 | --- | --- |
-| **Flutter (Dart)** | Un solo código fuente, compilado únicamente a web |
+| **Flutter (Dart)** | Un solo código fuente; se compila a web (target principal de despliegue) y opcionalmente a Android/iOS/desktop desde las mismas carpetas de plataforma |
 | **`flutter_map`** | Mapa interactivo con polígonos GeoJSON, motor Leaflet + OpenStreetMap |
 | **`http`** | Cliente HTTP hacia el backend FastAPI |
 | **`provider`** | Gestión de estado ligera para loading/data/error por pantalla |
@@ -37,43 +37,39 @@ frontend/
 │   ├── index.html
 │   └── manifest.json
 ├── lib/
-│   ├── main.dart
-│   ├── app.dart                          # Rutas: /map, /risk, /learn — nada más
+│   ├── main.dart                         # Entrypoint real: MyApp + MultiProvider
 │   ├── core/
 │   │   ├── constants/
 │   │   │   ├── app_colors.dart
 │   │   │   └── app_spacing.dart
 │   │   ├── theme/
 │   │   │   └── app_theme.dart
+│   │   ├── router/
+│   │   │   └── app_router.dart           # AppRoutes + GoRouter: /, /mapa, /aprende, /chatbot
 │   │   └── utils/
 │   │       └── responsive.dart           # Breakpoints centralizados
-│   ├── services/
-│   │   └── api_client.dart               # Cliente HTTP centralizado hacia el backend
 │   ├── features/
-│   │   ├── map/
-│   │   │   ├── models/
-│   │   │   │   └── sector.dart
-│   │   │   ├── providers/
-│   │   │   │   └── sectors_provider.dart # Fetch + polling de /sectors
-│   │   │   ├── map_page.dart
-│   │   │   └── widgets/
-│   │   │       ├── map_area.dart
-│   │   │       └── sector_detail_card.dart
+│   │   ├── landing/
+│   │   │   └── presentation/pages/landing_page.dart        # Ver Figma "Landing Page"
+│   │   ├── dashboard/                    # El "Mapa" del Figma
+│   │   │   ├── domain/models/sector.dart
+│   │   │   ├── presentation/providers/sectors_provider.dart  # Fetch + polling de /sectors
+│   │   │   └── presentation/pages/
+│   │   │       ├── map_page.dart
+│   │   │       └── sector_detail_page.dart   # Resumen / Historia / Sensores — Figma "Detalle de Producto"
 │   │   ├── risk/
-│   │   │   ├── models/
-│   │   │   │   └── risk_profile.dart
-│   │   │   ├── providers/
-│   │   │   │   └── risk_provider.dart    # Fetch de /risk/{sector}
-│   │   │   ├── risk_page.dart
-│   │   │   └── widgets/
-│   │   │       ├── sector_selector.dart
-│   │   │       └── risk_profile_card.dart
-│   │   └── learn/
-│   │       ├── models/
-│   │       │   └── education_content.dart
-│   │       └── learn_page.dart
+│   │   │   ├── domain/models/riesgo.dart
+│   │   │   └── presentation/providers/risk_provider.dart   # Fetch de /risk/{sector}; alimenta la pestaña
+│   │   │                                                    # "Historia" de sector_detail_page.dart — sin
+│   │   │                                                    # pantalla ni ruta propia (ver §6)
+│   │   ├── learn/
+│   │   │   └── presentation/pages/learn_page.dart
+│   │   └── chatbot/
+│   │       └── presentation/pages/chatbot_page.dart   # Hoy stub visual, ver §6/§8
 │   └── shared/
 │       └── widgets/
+│           ├── landing_header.dart       # Header global (todas las páginas)
+│           ├── landing_footer.dart       # Footer global (todas las páginas)
 │           ├── adaptive_scaffold.dart    # Navbar responsive (inferior en móvil, lateral en desktop)
 │           ├── loading_state.dart
 │           ├── error_state.dart
@@ -81,10 +77,9 @@ frontend/
 └── test/
 ```
 
-**Lo que no existe en esta estructura, a propósito:**
-- Ninguna carpeta de plataforma nativa (`android/`, `ios/`, etc.).
-- `features/landing/` y `features/chatbot/` — no forman parte del alcance del producto.
-- Cualquier archivo de manejo de sesión, token o login.
+**Lo que no existe en esta estructura, a propósito:** archivos de manejo de sesión, token o login (principio 2 — no hay pantalla de login).
+
+Todo lo demás —landing, chatbot, plataformas nativas— se conserva; están respaldados por el Figma del equipo, no son scaffold heredado sin revisar.
 
 ---
 
@@ -138,17 +133,19 @@ class SectorsProvider extends ChangeNotifier {
 
 `flutter_map` renderiza los polígonos del GeoJSON recibido, coloreados según el campo `estado` (`verde`/`amarillo`/`rojo`/`gris`) que ya llega calculado desde el backend — el frontend no calcula umbrales, solo pinta lo que recibe.
 
-Al tocar un sector aparece `sector_detail_card.dart` con los valores exactos, consumiendo `GET /sectors/{id}` bajo demanda (sin polling continuo para el detalle).
+Al tocar "Ver detalle del sector" (o un sector en el mapa) se navega a `sector_detail_page.dart` — ver §6.
 
 ---
 
-## 6. Módulo Riesgo por Dirección
+## 6. Módulo Detalle de Sector
 
-**Flujo:**
-1. Usuario selecciona un barrio/comuna con `sector_selector.dart` (dropdown, sin input de texto libre ni geocoding).
-2. `risk_provider.dart` llama `GET /risk/{sector}` una sola vez (sin polling — un perfil histórico no cambia en tiempo real).
-3. `risk_profile_card.dart` muestra promedio anual, peor/mejor mes y días sobre límite OMS.
-4. Si `historico_suficiente: false` en la respuesta, se muestra un aviso claro en vez de presentar el dato como si fuera confiable.
+**Reemplaza lo que este documento llamaba antes "Módulo Riesgo por Dirección".** No es una pantalla de navegación aparte con selector de barrio — es la página a la que se llega desde el mapa (botón "Ver detalle del sector" o tap en un sector), con tres pestañas (Figma "Detalle de Producto"):
+
+1. **Resumen** — indicadores actuales (PM2.5, CO2, humedad) y evolución de las últimas 24h, desde `GET /sectors/{id}` bajo demanda (sin polling continuo para el detalle).
+2. **Historia** — perfil histórico anual: promedio anual, peor/mejor mes, días sobre el límite OMS, desde `GET /risk/{sector}` (`risk_provider.dart`, fetch bajo demanda, sin polling — un perfil histórico no cambia en tiempo real). Si `historico_suficiente: false` en la respuesta, se muestra un aviso claro en vez de presentar el dato como si fuera confiable.
+3. **Sensores** — ubicación y lista de sensores del sector en un mini-mapa.
+
+Botones de acción: "Preguntar al chatbot" (navega a `/chatbot`) y "Ver el mapa" (vuelve a `/mapa`).
 
 ---
 
@@ -160,13 +157,25 @@ La pantalla más simple del proyecto: contenido de `GET /education`, o empaqueta
 
 ## 8. Navegación
 
-Tres secciones, adaptadas por breakpoint mediante `adaptive_scaffold.dart`:
+Nav global (header/footer compartidos, `shared/widgets/landing_header.dart` y `landing_footer.dart`), replicando el Figma:
 
 ```scheme
-Mapa | Riesgo por Dirección | Aprender
+Inicio | Mapa | Aprende | Chatbot
 ```
 
-Sin rutas de landing ni de chatbot — el usuario entra directo al mapa.
+El detalle de sector (§6) se alcanza únicamente desde el mapa — no aparece como ítem de navegación propio.
+
+**Decisión (2026-07-23):** landing y chatbot se conservan como parte de la navegación principal — respaldados por el Figma del equipo, no son scaffold heredado.
+
+**Actualización (2026-07-25): la pausa del chatbot terminó, y quedó conectado de punta a punta.** `POST /chatbot` (ver `03-Arquitectura-Backend.md` §3) recibe `{mensaje, historial}` y devuelve `{respuesta, acciones, contexto_actualizado}`. Del lado Flutter:
+
+- `ChatbotProvider` (`features/chatbot/presentation/providers/`) mantiene la conversación, con el mismo patrón que `SectorsProvider` pero **sin polling** — aquí solo se habla cuando el usuario escribe.
+- **El historial vive en el cliente** y viaja completo en cada petición: el backend no guarda estado de conversación. Por eso el provider se registra en `main.dart` (no en la ruta), para que la conversación sobreviva a salir y volver a `/chatbot`.
+- El turno del usuario se pinta antes de la respuesta, y **se conserva si la petición falla** — borrarlo haría parecer que nunca escribió. `reintentar()` lo reenvía sin duplicarlo.
+- `ChatbotNoDisponibleException` distingue el `503` (servidor sin `OPENAI_API_KEY`) del resto de errores: no es transitorio, así que la UI muestra "Fuera de línea" y **no** ofrece reintentar. El badge tiene tres estados, no dos: hasta el primer mensaje no hay forma de saber si el asistente está configurado, y afirmar "En línea" antes de eso sería inventar.
+- Los botones de `acciones` llegan de una lista cerrada que el backend valida, así que cada uno tiene un destino conocido: dos navegan (`/mapa`, `/aprende`) y el resto se reenvían como una pregunta más.
+
+Ver `05-Discrepancias.md`.
 
 ---
 
@@ -186,4 +195,4 @@ Genera archivos estáticos desplegables en cualquier hosting simple (Vercel, Net
 - Cada pantalla maneja explícitamente sus tres estados: cargando, con datos, error — sin excepción.
 - El polling del mapa se detiene correctamente al salir de la pantalla (`dispose()` cancela el `Timer`), para no gastar datos innecesariamente en móvil.
 - Validado manualmente en al menos un viewport de escritorio y uno de teléfono (devtools o dispositivo real) antes del pitch.
-- Cero carpetas de plataforma nativa, cero referencias a sesión/token, cero rutas de landing o chatbot en el repositorio.
+- Cero referencias a sesión/token en el repositorio. (Plataformas nativas, landing y chatbot se conservan — ver §1, §3, §6 y §8.)

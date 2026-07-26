@@ -6,13 +6,21 @@ sin golpear ClickHouse en cada request.
 - `sensor_sector_cache`: mapeo sensor_name -> sector_id, resuelto una
   vez con SectorIndex + posiciones_sensores() (TTL largo, ~1h, porque
   la posición física de un sensor no cambia con frecuencia).
+- `chatbot_context_cache`: snapshot de contexto que se le inyecta al LLM
+  en POST /chatbot (services/chatbot_context.py), TTL corto (~1min) para
+  no reconstruirlo en cada mensaje del usuario.
 """
 
 from cachetools import TTLCache
 
-from config import TTL_SECTORS_SEGUNDOS, TTL_MAPEO_SENSOR_SECTOR_SEGUNDOS
+from config import (
+    TTL_SECTORS_SEGUNDOS,
+    TTL_MAPEO_SENSOR_SECTOR_SEGUNDOS,
+    TTL_CONTEXTO_CHATBOT_SEGUNDOS,
+)
 
 # maxsize=1 porque cada cache solo guarda un único valor agregado
 # bajo una clave fija (no hay parámetros que varíen la respuesta cacheada).
 sectors_cache: TTLCache = TTLCache(maxsize=1, ttl=TTL_SECTORS_SEGUNDOS)
 sensor_sector_cache: TTLCache = TTLCache(maxsize=1, ttl=TTL_MAPEO_SENSOR_SECTOR_SEGUNDOS)
+chatbot_context_cache: TTLCache = TTLCache(maxsize=1, ttl=TTL_CONTEXTO_CHATBOT_SEGUNDOS)

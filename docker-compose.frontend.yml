@@ -1,0 +1,19 @@
+services:
+
+  # ─────────────────────────────────────────
+  # FRONTEND — Flutter web (build estático servido por nginx)
+  # Compose alterno: solo levanta el frontend, sin el backend.
+  # API_BASE_URL debe apuntar a donde el navegador del cliente pueda
+  # alcanzar al backend (ej. http://<IP-del-servidor>:8000), no a
+  # localhost salvo que accedas desde la misma máquina.
+  # ─────────────────────────────────────────
+  web:
+    build:
+      context: ./Frontend/ecobytes
+      dockerfile: Dockerfile
+      args:
+        API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+    container_name: ecobytes_web
+    restart: unless-stopped
+    ports:
+      - "8080:80"           # http://localhost:8080
