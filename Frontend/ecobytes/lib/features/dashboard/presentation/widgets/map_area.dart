@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../../core/utils/geo_utils.dart';
 import '../../domain/models/sector.dart';
 
@@ -16,12 +17,14 @@ class MapArea extends StatelessWidget {
     this.sectorSeleccionadoId,
     this.interactive = true,
     this.onSectorTap,
+    this.showLegend = true,
   });
 
   final List<Sector> sectores;
   final String? sectorSeleccionadoId;
   final bool interactive;
   final ValueChanged<String>? onSectorTap;
+  final bool showLegend;
 
   static const _caliCenter = LatLng(3.4516, -76.5320);
 
@@ -40,6 +43,7 @@ class MapArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sectoresConDatos = sectores.where((s) => s.tieneDatos).length;
+    final isMobile = context.isMobile;
 
     return Stack(
       children: [
@@ -72,14 +76,15 @@ class MapArea extends StatelessWidget {
             ),
           ],
         ),
-        Positioned(
-          left: AppSpacing.md,
-          bottom: AppSpacing.md,
-          child: _MapLegend(
-            coberturaSectores: sectoresConDatos,
-            totalSectores: sectores.length,
+        if (showLegend && !isMobile)
+          Positioned(
+            left: AppSpacing.md,
+            bottom: AppSpacing.md,
+            child: MapLegend(
+              coberturaSectores: sectoresConDatos,
+              totalSectores: sectores.length,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -100,8 +105,8 @@ class MapArea extends StatelessWidget {
   }
 }
 
-class _MapLegend extends StatelessWidget {
-  const _MapLegend({
+class MapLegend extends StatelessWidget {
+  const MapLegend({
     required this.coberturaSectores,
     required this.totalSectores,
   });
