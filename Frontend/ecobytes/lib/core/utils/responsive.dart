@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_breakpoints.dart';
+import '../constants/app_spacing.dart';
 
 /// Tipos de pantalla soportados por la aplicación.
 enum ScreenType { mobile, tablet, desktop }
@@ -42,6 +43,25 @@ extension ResponsiveContext on BuildContext {
   EdgeInsets get pagePadding => EdgeInsets.symmetric(
         horizontal: responsiveValue(mobile: 20.0, tablet: 32.0, desktop: 48.0),
       );
+}
+
+/// Cuántas tarjetas de al menos [anchoMinimo] caben en [anchoDisponible],
+/// con [espaciado] entre ellas.
+///
+/// Se usa donde el número de tarjetas viene de datos y no del código: fijar
+/// las columnas a mano (`isMobile ? 1 : 4`) descuadra la grilla en cuanto el
+/// backend devuelve una cantidad distinta a la prevista. Nunca devuelve menos
+/// de 1 ni más de [maximo], para que una lista larga no genere columnas
+/// diminutas en escritorio.
+int columnasParaAncho(
+  double anchoDisponible, {
+  required double anchoMinimo,
+  double espaciado = AppSpacing.lg,
+  int maximo = 4,
+}) {
+  if (anchoDisponible <= 0) return 1;
+  final cabidas = ((anchoDisponible + espaciado) / (anchoMinimo + espaciado)).floor();
+  return cabidas.clamp(1, maximo);
 }
 
 /// Contenedor adaptativo que limita el ancho máximo del contenido en pantallas grandes.

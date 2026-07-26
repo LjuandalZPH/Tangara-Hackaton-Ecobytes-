@@ -140,6 +140,48 @@ Si el sector tiene menos de un umbral mínimo de datos históricos (ej. menos de
 ### `GET /education`
 Devuelve el contenido estático de `data/educacion.json`. No requiere lógica adicional — es deliberadamente el endpoint más simple del sistema.
 
+**Response** (abreviada; el archivo completo está en `Backend/data/educacion.json`):
+```json
+{
+  "version": 2,
+  "ui": {
+    "hero": { "etiqueta": "APRENDE", "titulo": "...", "descripcion": "..." },
+    "seccion_senales": { "etiqueta": "QUÉ MEDIMOS", "titulo": "..." },
+    "seccion_niveles": { "etiqueta": "CALIDAD DEL AIRE", "titulo": "..." },
+    "seccion_recomendaciones": { "etiqueta": "CUÍDATE", "titulo": "..." },
+    "titulo_recomendaciones_generales": "Consejos generales"
+  },
+  "umbrales_pm25_ug_m3": { "bueno": 15, "moderado": 35 },
+  "contaminantes": [
+    {
+      "id": "pm25", "sigla": "PM2.5", "nombre": "Partículas finas",
+      "nombre_largo": "Material Particulado PM2.5", "es_contaminante": true,
+      "descripcion": "...",
+      "efectos_en_salud": ["...", "..."],
+      "limites": { "resumen": "<15 µg/m³ bueno (OMS)", "detalle": ["..."], "fuente": "..." }
+    }
+  ],
+  "niveles_calidad": [
+    { "id": "verde", "nombre_color": "Verde", "descripcion": "..." }
+  ],
+  "recomendaciones_por_perfil": [
+    { "id": "general", "emoji": "🏃", "perfil": "Población general", "texto": "..." }
+  ],
+  "recomendaciones_generales": ["...", "..."],
+  "fuente": { "nombre": "Organización Mundial de la Salud (OMS) — ...", "url": "https://..." }
+}
+```
+
+Tres cosas que no son obvias:
+
+1. **`contaminantes` incluye la humedad**, que no lo es (`es_contaminante: false`, `efectos_en_salud: []`). La clave conserva ese nombre porque el chatbot ya la consumía así; el frontend las llama "señales medidas".
+2. **`limites` tiene la misma forma para las tres señales** (`resumen` / `detalle` / `fuente`). Antes era irregular —PM2.5 traía números, CO2 solo una nota, la humedad nada— y eso obligaba a parsing defensivo en el cliente.
+3. **`niveles_calidad` no trae colores ni etiquetas**, solo `id` y la descripción larga. El cliente deriva el color y el "Buena"/"Dañina" de su propio enum de estado, el mismo con el que pinta el mapa: si el JSON los duplicara, la pantalla que enseña la escala podría acabar mostrando una distinta de la que el mapa aplica.
+
+**Los umbrales 15/35 están escritos aquí y también en `config.py`.** Es una duplicación consciente: se aceptó para que el endpoint siguiera siendo servir-el-archivo-tal-cual. Si cambias uno, cambia el otro (hay comentarios cruzados en ambos archivos). El riesgo es bajo porque son constantes de la OMS 2021, no parámetros ajustables.
+
+Este archivo lo consumen **dos** clientes: la pantalla "Aprende" del frontend y el propio chatbot (`services/chatbot_context.py`, que filtra `ui` y `niveles_calidad` por ser copy de presentación). Esa es toda la razón de ser del endpoint: que el asistente y la pantalla no puedan darle cifras distintas al mismo usuario, como pasaba antes con el CO2 (la pantalla decía 800 ppm, el JSON 1000).
+
 ### `POST /chatbot`
 **Agregado el 2026-07-25.** Asistente ambiental conversacional para la pantalla `/chatbot` del frontend. Es el **único endpoint que no es de solo lectura sobre ClickHouse** (llama a un proveedor externo, OpenAI) y el único `POST` del contrato.
 

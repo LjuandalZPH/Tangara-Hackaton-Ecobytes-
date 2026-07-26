@@ -151,7 +151,14 @@ Botones de acción: "Preguntar al chatbot" (navega a `/chatbot`) y "Ver el mapa"
 
 ## 7. Módulo Educativo
 
-La pantalla más simple del proyecto: contenido de `GET /education`, o empaquetado como asset local (`education_content.dart`) si se prefiere evitar hasta esa llamada de red. Sin navegación interna, sin estado más allá de loading/loaded.
+La pantalla más simple del proyecto. **Decisión tomada (2026-07-25): se conecta a `GET /education`**, no se empaqueta como asset editable a mano.
+
+El motivo no fue la pureza arquitectónica, fue un bug real: la pantalla tenía "<800 ppm" de CO2 hardcodeado y `educacion.json` decía 1000 ppm. Como el chatbot ya leía ese JSON, **el asistente y la pantalla le daban cifras distintas al mismo usuario**. Con una sola fuente eso deja de poder pasar.
+
+- `EducationProvider` (`features/learn/presentation/providers/`) — carga única bajo demanda, sin polling, idempotente: volver a `/aprende` no repite la petición.
+- **Sigue funcionando sin backend.** `assets/educacion.json` es una **copia literal** del archivo del backend (no una segunda fuente editable) y se usa como respaldo si la red falla. Cuando eso ocurre, la pantalla lo dice con un aviso: contenido congelado presentado como fresco sería el mismo problema del 800/1000 en otra forma.
+- Los umbrales de PM2.5 y los colores de los cuatro estados **no** se leen del JSON: se derivan de `EstadoSector`, el mismo enum con el que el mapa colorea las comunas, para que la pantalla que *enseña* la escala no pueda mostrar una distinta de la que el mapa aplica.
+- El número de tarjetas por fila se deriva del ancho disponible (`columnasParaAncho` en `core/utils/responsive.dart`), no de una constante: con datos del backend, fijarlo a mano descuadra la grilla en cuanto cambia la cantidad de elementos.
 
 ---
 

@@ -1,73 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/utils/responsive.dart';
-
 
 import '../../../../shared/widgets/status_badge.dart'; //Aquí dentro viven EcoCard, StatusBadge y SectionLabel
 
 import '../../../../shared/widgets/landing_footer.dart';
 import '../../../../shared/widgets/landing_header.dart';
+import '../../../dashboard/domain/models/sector.dart';
+import '../../domain/models/contenido_educativo.dart';
+import '../providers/education_provider.dart';
 
-// --- ESTRUCTURAS DE DATOS (RECORDS) ---
-//
-// Los umbrales de PM2.5 y los 4 estados de calidad del aire deben coincidir
-// con los que usa el resto de la app (Backend/config.py: PM25_UMBRAL_BUENO=15,
-// PM25_UMBRAL_MODERADO=35; EstadoSectorX en sector.dart) — este contenido es
-// educativo, pero no puede enseñar una escala distinta a la que el mapa y el
-// detalle de sector realmente usan. No se incluye O3: el backend no lo mide
-// en ningún endpoint (`Sector`/`SectorDetalle` solo traen PM2.5, CO2 y humedad).
-
-const _contaminantes = <(String, String, String, String)>[
-  (
-    'PM2.5',
-    'Partículas finas',
-    'Partículas diminutas de polvo, humo y hollín que penetran hasta los pulmones y el torrente sanguíneo. Provienen del tráfico, la quema de biomasa y la industria.',
-    '<15 µg/m³ bueno (OMS)',
-  ),
-  (
-    'CO2',
-    'Dióxido de carbono',
-    'Gas producido por la combustión de vehículos e industrias. En espacios abiertos se dispersa, pero niveles altos sostenidos indican poca ventilación o tráfico denso.',
-    '<800 ppm, referencia general',
-  ),
-  (
-    'HR',
-    'Humedad relativa',
-    'No es un contaminante, pero influye en cómo se sienten y dispersan las partículas en el aire. Útil para interpretar el resto de las métricas.',
-    '30-60% ideal',
-  ),
-];
-
-const _nivelesCalidad = <(Color, String, String, String)>[
-  (AppColors.statusGood, 'Verde', 'Buena', 'PM2.5 por debajo de 15 µg/m³. Ideal para actividades al aire libre sin restricciones.'),
-  (AppColors.statusModerate, 'Amarillo', 'Moderada', 'PM2.5 entre 15 y 35 µg/m³. Aceptable para la mayoría; grupos sensibles podrían notar síntomas leves.'),
-  (AppColors.statusBad, 'Rojo', 'Dañina', 'PM2.5 por encima de 35 µg/m³. Se recomienda evitar actividad física intensa al aire libre.'),
-  (AppColors.textMuted, 'Gris', 'Sin datos', 'El sector no tiene sensores cercanos, o su última lectura es demasiado antigua para considerarse confiable.'),
-];
-
-const _recomendaciones = <(String, String, String)>[
-  (
-    '🏃‍♂️',
-    'Población general',
-    'Con calidad del aire moderada (amarillo) puedes hacer ejercicio al aire libre con normalidad. Evita las horas pico de tráfico (7–9am y 5–7pm) si vives cerca de avenidas principales.',
-  ),
-  (
-    '👶',
-    'Niños y mujeres embarazadas',
-    'Sus vías respiratorias son más sensibles. Prioriza actividades al aire libre en zonas verdes como Pance o la Buitrera, lejos del tráfico denso.',
-  ),
-  (
-    '🫁',
-    'Personas con asma o EPOC',
-    'Lleva siempre tu inhalador de rescate. Si la calidad del aire está en rojo, considera mover el ejercicio a interiores o a primera hora de la mañana.',
-  ),
-  (
-    '👵',
-    'Adultos mayores',
-    'Revisa el estado de calidad del aire antes de salir a caminar. Prefiere paseos cortos en horarios de menor contaminación, generalmente temprano en la mañana.',
-  ),
-];
+// Todo el contenido de esta pantalla viene de `GET /education`, que sirve
+// `Backend/data/educacion.json`. Ese mismo archivo alimenta al chatbot: es la
+// fuente única del contenido educativo, para que la pantalla y el asistente no
+// puedan dar cifras distintas (antes aquí decía "<800 ppm" de CO2 y el chatbot
+// decía 1000). Los umbrales de PM2.5 y los colores de los cuatro estados no se
+// leen del JSON: se derivan de `EstadoSector`, el mismo enum con el que el mapa
+// colorea las comunas.
 
 class LearnPage extends StatefulWidget {
   const LearnPage({super.key});
@@ -80,12 +32,30 @@ class _LearnPageState extends State<LearnPage> {
   bool _menuOpen = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Se difiere al primer frame porque `EducationProvider` está registrado en
+    // el MultiProvider global y ya tiene listeners: llamar a `cargar()` durante
+    // el build dispararía "setState() called during build". Mismo motivo que en
+    // sector_detail_page.dart.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<EducationProvider>().cargar();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final provider = context.watch<EducationProvider>();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
+            // El header y el footer quedan fuera del switch de estado: si el
+            // backend está caído, el usuario tiene que poder seguir navegando
+            // (a /aprende se llega también desde un botón del chatbot).
             LandingHeader(
               menuOpen: _menuOpen,
               onMenuToggle: () => setState(() => _menuOpen = !_menuOpen),
@@ -95,11 +65,9 @@ class _LearnPageState extends State<LearnPage> {
                 child: Column(
                   children: [
                     if (_menuOpen) const LandingMobileNav(),
-                    
-                    const _HeroSection(),
-                    const _QueMedimosSection(),
-                    const _NivelesCalidadSection(),
-                    const _RecomendacionesSection(),
+
+                    _buildContenido(provider),
+
                     const LandingFooter(),
                   ],
                 ),
@@ -110,10 +78,140 @@ class _LearnPageState extends State<LearnPage> {
       ),
     );
   }
+
+  Widget _buildContenido(EducationProvider provider) {
+    final contenido = provider.contenido;
+
+    switch (provider.estado) {
+      case EstadoEducacion.inicial:
+      case EstadoEducacion.cargando:
+        return const SizedBox(
+          height: 400,
+          child: Center(child: CircularProgressIndicator()),
+        );
+
+      case EstadoEducacion.error:
+        return _ErrorContenido(
+          mensaje: provider.mensajeError ??
+              'No fue posible cargar el contenido educativo.',
+          onReintentar: provider.cargar,
+        );
+
+      case EstadoEducacion.listo:
+        if (contenido == null) {
+          return _ErrorContenido(
+            mensaje: 'No fue posible cargar el contenido educativo.',
+            onReintentar: provider.cargar,
+          );
+        }
+        return Column(
+          children: [
+            _HeroSection(copy: contenido.hero),
+            if (provider.desdeFallback)
+              _AvisoSinConexion(onReintentar: provider.cargar),
+            _QueMedimosSection(
+              copy: contenido.seccionSenales,
+              senales: contenido.senales,
+            ),
+            _NivelesCalidadSection(
+              copy: contenido.seccionNiveles,
+              niveles: contenido.niveles,
+            ),
+            _RecomendacionesSection(
+              copy: contenido.seccionRecomendaciones,
+              tituloGenerales: contenido.tituloRecomendacionesGenerales,
+              porPerfil: contenido.recomendacionesPorPerfil,
+              generales: contenido.recomendacionesGenerales,
+              fuente: contenido.fuente,
+            ),
+          ],
+        );
+    }
+  }
+}
+
+/// Aviso de que lo que se está viendo salió del asset local y no del backend.
+/// Sin esto, contenido congelado se presentaría como fresco.
+class _AvisoSinConexion extends StatelessWidget {
+  const _AvisoSinConexion({required this.onReintentar});
+
+  final VoidCallback onReintentar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFFEF9C3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
+      child: ContentContainer(
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_off, size: 18, color: Color(0xFF854D0E)),
+            const SizedBox(width: AppSpacing.sm),
+            const Expanded(
+              child: Text(
+                'Estás viendo contenido guardado, sin conexión al servidor.',
+                style: TextStyle(color: Color(0xFF854D0E), fontSize: 13),
+              ),
+            ),
+            TextButton(
+              onPressed: onReintentar,
+              child: const Text('Reintentar', style: TextStyle(fontSize: 13)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorContenido extends StatelessWidget {
+  const _ErrorContenido({required this.mensaje, required this.onReintentar});
+
+  final String mensaje;
+  final VoidCallback onReintentar;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 400,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, color: AppColors.textMuted, size: 32),
+            const SizedBox(height: AppSpacing.md),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Text(
+                mensaje,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textMuted),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            ElevatedButton(
+              onPressed: onReintentar,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _HeroSection extends StatelessWidget {
-  const _HeroSection();
+  const _HeroSection({required this.copy});
+
+  final CopySeccion copy;
 
   @override
   Widget build(BuildContext context) {
@@ -128,10 +226,10 @@ class _HeroSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionLabel(text: 'APRENDE'),
+            SectionLabel(text: copy.etiqueta),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Entiende el aire que respiras en Cali',
+              copy.titulo,
               style: Theme.of(context).textTheme.displayMedium?.copyWith(
                     fontSize: context.responsiveValue(mobile: 28, desktop: 36),
                     fontWeight: FontWeight.w800,
@@ -139,7 +237,7 @@ class _HeroSection extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              'Una guía sencilla sobre los contaminantes que medimos, qué significa cada estado de calidad del aire (verde, amarillo, rojo) y cómo proteger tu salud según la calidad del aire del día.',
+              copy.descripcion,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: AppColors.textMuted,
                     fontSize: 16,
@@ -153,7 +251,10 @@ class _HeroSection extends StatelessWidget {
 }
 
 class _QueMedimosSection extends StatelessWidget {
-  const _QueMedimosSection();
+  const _QueMedimosSection({required this.copy, required this.senales});
+
+  final CopySeccion copy;
+  final List<SenalMedida> senales;
 
   @override
   Widget build(BuildContext context) {
@@ -166,10 +267,10 @@ class _QueMedimosSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionLabel(text: 'QUÉ MEDIMOS'),
+            SectionLabel(text: copy.etiqueta),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Cuatro señales, una foto clara del aire',
+              copy.titulo,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontSize: 24,
@@ -178,14 +279,20 @@ class _QueMedimosSection extends StatelessWidget {
             const SizedBox(height: AppSpacing.xl),
             LayoutBuilder(
               builder: (context, constraints) {
-                final isMobile = context.isMobile;
-                final columns = isMobile ? 1 : 3;
-                final itemWidth = (constraints.maxWidth - (columns - 1) * AppSpacing.lg) / columns;
+                // 320 de ancho mínimo reproduce las 3 columnas de escritorio
+                // (ancho útil 1104) y 1 en móvil, igual que antes.
+                final columns = columnasParaAncho(
+                  constraints.maxWidth,
+                  anchoMinimo: 320,
+                  maximo: 3,
+                );
+                final itemWidth =
+                    (constraints.maxWidth - (columns - 1) * AppSpacing.lg) / columns;
 
                 return Wrap(
                   spacing: AppSpacing.lg,
                   runSpacing: AppSpacing.lg,
-                  children: _contaminantes.map((data) {
+                  children: senales.map((senal) {
                     return SizedBox(
                       width: itemWidth,
                       child: EcoCard(
@@ -194,7 +301,7 @@ class _QueMedimosSection extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              data.$1,
+                              senal.sigla,
                               style: const TextStyle(
                                 color: AppColors.primaryGreen,
                                 fontWeight: FontWeight.bold,
@@ -202,7 +309,7 @@ class _QueMedimosSection extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              data.$2,
+                              senal.nombre,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -210,18 +317,25 @@ class _QueMedimosSection extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.md),
                             Text(
-                              data.$3,
+                              senal.descripcion,
                               style: TextStyle(
                                 color: AppColors.textMuted.withValues(alpha: 0.85),
                                 fontSize: 13,
                                 height: 1.4,
                               ),
                             ),
+                            // Los efectos en salud ya venían en el JSON pero la
+                            // pantalla nunca los mostraba. La humedad llega con
+                            // la lista vacía y su tarjeta queda como antes.
+                            if (senal.efectosEnSalud.isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.md),
+                              ...senal.efectosEnSalud.map(_bullet),
+                            ],
                             const SizedBox(height: AppSpacing.lg),
                             const Divider(color: AppColors.borderLight),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
-                              data.$4,
+                              senal.limites.resumen,
                               style: const TextStyle(
                                 color: AppColors.primaryGreen,
                                 fontWeight: FontWeight.w600,
@@ -243,8 +357,37 @@ class _QueMedimosSection extends StatelessWidget {
   }
 }
 
+/// Viñeta de texto reutilizada por las tarjetas y por los consejos generales.
+Widget _bullet(String texto) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '•  ',
+          style: TextStyle(color: AppColors.primaryGreen, fontSize: 13, height: 1.4),
+        ),
+        Expanded(
+          child: Text(
+            texto,
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _NivelesCalidadSection extends StatelessWidget {
-  const _NivelesCalidadSection();
+  const _NivelesCalidadSection({required this.copy, required this.niveles});
+
+  final CopySeccion copy;
+  final List<NivelCalidad> niveles;
 
   @override
   Widget build(BuildContext context) {
@@ -259,10 +402,10 @@ class _NivelesCalidadSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionLabel(text: 'CALIDAD DEL AIRE'),
+            SectionLabel(text: copy.etiqueta),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Qué significa cada estado',
+              copy.titulo,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontSize: 24,
@@ -271,14 +414,21 @@ class _NivelesCalidadSection extends StatelessWidget {
             const SizedBox(height: AppSpacing.xl),
             LayoutBuilder(
               builder: (context, constraints) {
-                final isMobile = context.isMobile;
-                final columns = isMobile ? 1 : 4;
-                final itemWidth = (constraints.maxWidth - (columns - 1) * AppSpacing.lg) / columns;
+                final columns = columnasParaAncho(
+                  constraints.maxWidth,
+                  anchoMinimo: 250,
+                );
+                final itemWidth =
+                    (constraints.maxWidth - (columns - 1) * AppSpacing.lg) / columns;
 
                 return Wrap(
                   spacing: AppSpacing.lg,
                   runSpacing: AppSpacing.lg,
-                  children: _nivelesCalidad.map((level) {
+                  children: niveles.map((nivel) {
+                    // color y etiqueta salen del enum, no del JSON: son los
+                    // mismos que pinta el mapa.
+                    final color = nivel.estado.color;
+
                     return SizedBox(
                       width: itemWidth,
                       child: EcoCard(
@@ -291,15 +441,15 @@ class _NivelesCalidadSection extends StatelessWidget {
                                   width: 24,
                                   height: 24,
                                   decoration: BoxDecoration(
-                                    color: level.$1,
+                                    color: color,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                 ),
                                 const SizedBox(width: AppSpacing.sm),
                                 Text(
-                                  level.$2,
+                                  nivel.nombreColor,
                                   style: TextStyle(
-                                    color: level.$1,
+                                    color: color,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
                                   ),
@@ -308,7 +458,7 @@ class _NivelesCalidadSection extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
-                              level.$3,
+                              nivel.estado.label,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -316,7 +466,7 @@ class _NivelesCalidadSection extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.md),
                             Text(
-                              level.$4,
+                              nivel.descripcion,
                               style: const TextStyle(
                                 color: AppColors.textMuted,
                                 fontSize: 13,
@@ -339,7 +489,19 @@ class _NivelesCalidadSection extends StatelessWidget {
 }
 
 class _RecomendacionesSection extends StatelessWidget {
-  const _RecomendacionesSection();
+  const _RecomendacionesSection({
+    required this.copy,
+    required this.tituloGenerales,
+    required this.porPerfil,
+    required this.generales,
+    required this.fuente,
+  });
+
+  final CopySeccion copy;
+  final String tituloGenerales;
+  final List<RecomendacionPerfil> porPerfil;
+  final List<String> generales;
+  final FuenteEducativa fuente;
 
   @override
   Widget build(BuildContext context) {
@@ -352,10 +514,10 @@ class _RecomendacionesSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionLabel(text: 'CUÍDATE'),
+            SectionLabel(text: copy.etiqueta),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Recomendaciones según tu perfil',
+              copy.titulo,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontSize: 24,
@@ -364,14 +526,17 @@ class _RecomendacionesSection extends StatelessWidget {
             const SizedBox(height: AppSpacing.xl),
             LayoutBuilder(
               builder: (context, constraints) {
-                final isMobile = context.isMobile;
-                final columns = isMobile ? 1 : 4;
-                final itemWidth = (constraints.maxWidth - (columns - 1) * AppSpacing.lg) / columns;
+                final columns = columnasParaAncho(
+                  constraints.maxWidth,
+                  anchoMinimo: 250,
+                );
+                final itemWidth =
+                    (constraints.maxWidth - (columns - 1) * AppSpacing.lg) / columns;
 
                 return Wrap(
                   spacing: AppSpacing.lg,
                   runSpacing: AppSpacing.lg,
-                  children: _recomendaciones.map((reco) {
+                  children: porPerfil.map((reco) {
                     return SizedBox(
                       width: itemWidth,
                       child: EcoCard(
@@ -387,14 +552,14 @@ class _RecomendacionesSection extends StatelessWidget {
                               ),
                               child: Center(
                                 child: Text(
-                                  reco.$1,
+                                  reco.emoji,
                                   style: const TextStyle(fontSize: 20),
                                 ),
                               ),
                             ),
                             const SizedBox(height: AppSpacing.lg),
                             Text(
-                              reco.$2,
+                              reco.perfil,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
@@ -402,7 +567,7 @@ class _RecomendacionesSection extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
-                              reco.$3,
+                              reco.texto,
                               style: const TextStyle(
                                 color: AppColors.textMuted,
                                 fontSize: 13,
@@ -417,6 +582,43 @@ class _RecomendacionesSection extends StatelessWidget {
                 );
               },
             ),
+
+            // Los consejos generales van a ancho completo, no en la grilla:
+            // son 5 y en una fila de 4 dejarían una tarjeta huérfana. Como
+            // lista crecen sin descuadrar nada.
+            if (generales.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xl),
+              EcoCard(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tituloGenerales,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    ...generales.map(_bullet),
+                  ],
+                ),
+              ),
+            ],
+
+            if (fuente.nombre.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                'Fuente: ${fuente.nombre}',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
+              if (fuente.url.isNotEmpty)
+                Text(
+                  fuente.url,
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+            ],
           ],
         ),
       ),

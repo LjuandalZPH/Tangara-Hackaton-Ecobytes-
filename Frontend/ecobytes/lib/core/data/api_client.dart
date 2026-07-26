@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../../features/chatbot/domain/models/mensaje_chat.dart';
 import '../../features/dashboard/domain/models/sector.dart';
+import '../../features/learn/domain/models/contenido_educativo.dart';
 import '../../features/risk/domain/models/riesgo.dart';
 import '../config/api_config.dart';
 
@@ -61,6 +62,11 @@ class ApiClient {
   Future<Riesgo> getRiesgo(String sectorId) async {
     final json = await _getJson('/risk/$sectorId');
     return Riesgo.fromJson(json);
+  }
+
+  Future<ContenidoEducativo> getContenidoEducativo() async {
+    final json = await _getJson('/education');
+    return ContenidoEducativo.fromJson(json);
   }
 
   /// Envía un mensaje al asistente ambiental. `historial` son los turnos
