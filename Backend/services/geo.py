@@ -5,11 +5,10 @@ shapely y resuelve a qué sector pertenece un punto (lat, lon).
 Se carga una sola vez al iniciar FastAPI (evento `startup` en main.py)
 y vive en memoria durante toda la ejecución del servicio.
 
-El GeoJSON son las 22 comunas oficiales de Cali (fuente IDESC, WGS84;
-ver `06-Plan-de-Accion.md` §2.3), cuyas propiedades son `comcodigo`
-("01".."22") y `comnombre` ("Comuna 01".."Comuna 22"). Aquí se
-normalizan al contrato público de la API (`comuna-2`, `Comuna 2`) que
-documenta `03-Arquitectura-Backend.md` §3.
+El GeoJSON son las 22 comunas oficiales de Cali (fuente IDESC, WGS84),
+cuyas propiedades son `comcodigo` ("01".."22") y `comnombre`
+("Comuna 01".."Comuna 22"). Aquí se normalizan al contrato público de
+la API (`comuna-2`, `Comuna 2`) que documenta docs/backend.md.
 """
 
 import json

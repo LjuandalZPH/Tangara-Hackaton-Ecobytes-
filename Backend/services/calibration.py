@@ -16,7 +16,7 @@ Referencia:
     Nadie ha verificado todavía si el pipeline de Tángara ya aplica esta
     misma corrección aguas arriba, al construir la capa Plata. Si lo
     hiciera, aquí se estaría corrigiendo dos veces y los valores saldrían
-    artificialmente bajos. Ver `06-Plan-de-Accion.md` §1 y §2.2.
+    artificialmente bajos. Ver docs/backlog.md.
 
 Este módulo es lógica de dominio pura: no importa FastAPI ni ClickHouse.
 Se aplica una sola vez, en `services/clickhouse_client.py`, para que el

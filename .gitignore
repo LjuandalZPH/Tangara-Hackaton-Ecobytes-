@@ -1,6 +1,11 @@
 # Variables de entorno — NUNCA subir al repo
 .env
 
+# Instrucciones locales para el asistente de IA (Claude Code) -- guía de
+# trabajo para quien desarrolla con su ayuda, no documentación del producto.
+# Sigue existiendo en el checkout de cada quien, pero no viaja en el repo.
+CLAUDE.md
+
 # Python
 __pycache__/
 *.py[cod]
@@ -17,9 +22,15 @@ build/
 *.log
 
 # Datos CSV de Tángara (pueden ser pesados) — no ignora data/ completa:
-# sectores.geojson y educacion.json sí deben versionarse (ver 03-Arquitectura-Backend.md §8)
+# sectores.geojson y educacion.json sí deben versionarse (ver docs/backend.md)
 *.csv
 *.csv.gz
+# Excepción: partitions.csv del firmware ESP32 no es un dato, es config de
+# build (esquema de particiones de flash) que tiene que versionarse -- sin
+# esto, *.csv de arriba lo excluye sin querer y cualquiera que clone el
+# repo pisa el mismo overflow de flash que costó resolver (ver
+# docs/firmware-esp32-kiosko.md).
+!Firmware/esp32-kiosko/partitions.csv
 
 # Grafo de conocimiento generado por graphify (~2 MB, regenerable con /graphify)
 graphify-out/

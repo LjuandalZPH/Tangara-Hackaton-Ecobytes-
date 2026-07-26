@@ -2,9 +2,8 @@
 Cliente async de ClickHouse.
 
 Todas las queries apuntan exclusivamente a `tangara_plata.plata_tangara_sensores`
-(el schema real disponible en este entorno; la arquitectura original —
-ver 03-Arquitectura-Backend.md— asume `tangara_gold`, una capa ya
-agregada que no existe todavía). El backend es de solo lectura: nunca
+(no a `tangara_gold`, una capa ya agregada que todavía no existe en el
+pipeline de Tángara). El backend es de solo lectura: nunca
 escribe en ClickHouse, la ingesta es responsabilidad del pipeline de
 Tángara, fuera de este repositorio.
 

@@ -39,3 +39,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    # Copia literal de Backend/data/educacion.json. Es el respaldo que usa
+    # /aprende cuando no hay backend, para que la pantalla no quede vacía.
+    # Si editas el JSON del backend, vuelve a copiarlo (ver Backend/data/README.md).
+    - assets/educacion.json

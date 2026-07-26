@@ -5,7 +5,7 @@ FastAPI app con CORS habilitado y routers registrados.
 Un único servicio, sin estado propio, sin base de datos propia más
 allá de un archivo GeoJSON estático (data/sectores.geojson). Todo dato
 de sensores viene de ClickHouse (tangara_plata), en modo solo lectura.
-Ver 03-Arquitectura-Backend.md en la raíz del repo.
+Ver docs/backend.md en la raíz del repo.
 """
 
 from pathlib import Path
@@ -36,7 +36,7 @@ app = FastAPI(
 # CORS — permite que Flutter web se conecte
 # ─────────────────────────────────────────
 # Dominio(s) real(es) configurados vía CORS_ORIGINS en .env (ver .env.example).
-# La lista vacía es intencional como default (03-Arquitectura-Backend.md §8):
+# La lista vacía es intencional como default (fail-closed, ver docs/backend.md):
 # sin CORS_ORIGINS no se permite ningún origen, en vez de permitirlos todos.
 if not settings.cors_origins_list:
     print("AVISO: CORS_ORIGINS está vacío — el navegador bloqueará al frontend. "

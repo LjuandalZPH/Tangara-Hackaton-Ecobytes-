@@ -16,7 +16,7 @@ abstract final class AppRoutes {
 
   /// Detalle de un sector — no es un ítem de navegación propio (no aparece
   /// en el nav global), solo se llega desde el mapa. Ver
-  /// 04-Arquitectura-Frontend.md §6.
+  /// docs/frontend.md.
   static const sectorDetail = '/mapa/:sectorId';
   static String sectorDetailPath(String sectorId) => '/mapa/$sectorId';
 }

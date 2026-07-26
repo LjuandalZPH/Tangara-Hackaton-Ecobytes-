@@ -18,9 +18,8 @@ class Settings(BaseSettings):
     clickhouse_database: str = "tangara_plata"
     clickhouse_secure: bool = True
 
-    # Vacío por defecto (fail-closed): el Definition of Done de
-    # 03-Arquitectura-Backend.md §8 exige CORS configurado explícitamente
-    # para el dominio del frontend. Un default de "*" combinado con
+    # Vacío por defecto (fail-closed): CORS debe configurarse explícitamente
+    # para el dominio del frontend (ver docs/backend.md). Un default de "*" combinado con
     # allow_credentials=True hace que Starlette refleje cualquier Origin,
     # es decir, acceso con credenciales desde cualquier sitio.
     cors_origins: str = ""
@@ -50,6 +49,12 @@ settings = Settings()
 #   - "amarillo"(moderado):15 <= PM2.5 <= 35
 #   - "rojo"    (dañino):  PM2.5 > 35
 # ─────────────────────────────────────────────────────────────
+#
+# OJO: estas dos cifras también están escritas en `data/educacion.json`
+# (`umbrales_pm25_ug_m3` y los textos de `niveles_calidad`), que es lo que
+# lee la pantalla "Aprende" del frontend. Si cambias una, cambia la otra:
+# el contenido educativo no puede enseñar una escala distinta de la que el
+# mapa usa para colorear. Ver `Backend/data/README.md`.
 PM25_UMBRAL_BUENO = 15.0
 PM25_UMBRAL_MODERADO = 35.0
 
