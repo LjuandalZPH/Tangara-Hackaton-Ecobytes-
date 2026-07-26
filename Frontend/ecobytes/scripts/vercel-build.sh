@@ -11,4 +11,4 @@ export PATH="${FLUTTER_DIR}/bin:${PATH}"
 
 flutter config --enable-web
 flutter pub get
-flutter build web --release --base-href "/"
+flutter build web --release --base-href "/" --dart-define=API_BASE_URL="${API_BASE_URL:-http://localhost:8000}"
