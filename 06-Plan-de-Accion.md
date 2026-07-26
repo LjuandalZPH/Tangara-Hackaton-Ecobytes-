@@ -177,7 +177,7 @@ Esto confirma que la cadena completa funciona: geohash de `tangara_plata` → `g
 - [x] Estado `gris` / `sin_datos_recientes` modelado: `EstadoSector.gris` con la etiqueta "Sin datos" en la leyenda, más una línea de cobertura real calculada de los datos.
 - [x] `MapaPage` deja de mostrar el placeholder: `MapArea` pinta los 22 polígonos con `PolygonLayer`. Se eliminaron los datos inventados que tenía (5 sectores ficticios, grilla decorativa, "AQI promedio: 32").
 
-**Queda abierto** (ver `07-Integracion-Backend-Frontend.md` §8): solo `GET /education` sigue sin conectar (la página Aprende es contenido estático propio). `GET /sectors/{id}` y `GET /risk/{sector}` ya tienen UI (paso 9), `_SidePanelSection` ya se conectó a datos reales (paso 10), y la landing completa (`StatsBar`, `hero_section.dart`, `dashboard_preview_section.dart`) ya no usa `MockSensorRepository` (paso 10, 2026-07-24) — ese archivo, junto con `sensor_data.dart`, `control_sidebar.dart` y `dashboard_layout.dart`, se eliminó del repo por completo.
+**Ya no queda nada abierto de integración (2026-07-25):** `GET /education` fue el último endpoint sin conectar y ya lo consume `EducationProvider` (paso 11). Los seis endpoints del contrato tienen consumidor real en el frontend. `GET /sectors/{id}` y `GET /risk/{sector}` ya tienen UI (paso 9), `_SidePanelSection` ya se conectó a datos reales (paso 10), y la landing completa (`StatsBar`, `hero_section.dart`, `dashboard_preview_section.dart`) ya no usa `MockSensorRepository` (paso 10, 2026-07-24) — ese archivo, junto con `sensor_data.dart`, `control_sidebar.dart` y `dashboard_layout.dart`, se eliminó del repo por completo.
 
 ---
 

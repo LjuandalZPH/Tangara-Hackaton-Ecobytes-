@@ -131,7 +131,7 @@
 
 ## 📚 EPI-05 — Contenido Educativo
 
-**Objetivo:** conservar la pantalla de "Aprender" ya construida (bien maquetada, actualmente con contenido hardcodeado) y decidir si vale la pena conectarla a un endpoint o dejarla estática.
+**Objetivo:** conservar la pantalla de "Aprender" ya construida y decidir si vale la pena conectarla a un endpoint o dejarla estática. ✅ **Decidido y ejecutado (2026-07-25): se conectó a `GET /education`.** El contenido hardcodeado desapareció; queda un asset local solo como respaldo offline, copia literal del JSON del backend.
 
 ### HU-04 — Sección educativa
 > Como estudiante o usuario curioso, quiero leer una explicación clara de PM2.5 y CO2, sus efectos en la salud y qué puedo hacer, sin tener que navegar múltiples pantallas.
@@ -144,9 +144,10 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | T-05.1 | ~~Tarea~~ | ~~Extraer el contenido hardcodeado de `learn_page.dart`~~ **Cerrada (2026-07-25):** las tres constantes de tuplas desaparecieron; el contenido vive en `Backend/data/educacion.json`. Diseño de escritorio sin cambios. | Media | 2 | 2 | T-01.4 |
 | T-05.2 | ~~Tarea~~ | ~~Decidir y ejecutar: conectar a `GET /education` o dejar asset local~~ **Cerrada (2026-07-25): se conectó al endpoint**, y además se amplió el JSON para que cubra todo el contenido de la pantalla. Motivo: la pantalla decía "<800 ppm" de CO2 y el chatbot (que ya leía el JSON) decía 1000 — dos cifras distintas al mismo usuario. Se conserva un asset de respaldo, pero es una **copia literal** del JSON del backend, no una segunda fuente editable. | Baja | 1 | 2 | T-05.1 |
-| T-05.3 | Tarea | Verificar legibilidad y adaptabilidad de la pantalla en móvil con `responsive.dart`. | Baja | 1 | 2 | T-05.1, T-00.6 |
+| T-05.3 | Tarea | Verificar legibilidad y adaptabilidad de la pantalla en móvil con `responsive.dart`. **Parcial (2026-07-25):** `test/learn_page_test.dart` ya comprueba que no hay overflow en 390/900/1400 px, y las columnas se derivan del ancho (`columnasParaAncho`). Falta la revisión visual de legibilidad en dispositivo real. | Baja | 1 | 2 | T-05.1, T-00.6 |
+| T-05.4 | Tarea | **Nueva (2026-07-25):** extraer un widget compartido de error/carga a `shared/widgets/`. El bloque "icono `cloud_off` + mensaje + Reintentar" está duplicado **cuatro** veces: `map_page.dart`, `sector_detail_page.dart` (`_ErrorState`), `chatbot_page.dart` (`_MensajeDeError`) y `learn_page.dart` (`_ErrorContenido`). No se hizo junto con T-05.2 para no tocar tres pantallas ya cerradas dentro de una tarea de prioridad Baja. | Baja | 2 | — | — |
 
-**Subtotal: 4 SP**
+**Subtotal: 6 SP** (4 originales + 2 de `T-05.4`, agregada el 2026-07-25)
 
 ---
 
