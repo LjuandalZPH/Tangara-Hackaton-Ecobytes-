@@ -86,6 +86,20 @@ MAX_TURNOS_HISTORIAL_CHATBOT = 10
 # Longitud máxima del mensaje del usuario en POST /chatbot
 MAX_LONGITUD_MENSAJE_CHATBOT = 1000
 
+# Vueltas máximas del bucle de function calling (services/chatbot_tools.py).
+# Cada vuelta es una llamada facturable a OpenAI: sin tope, un modelo que se
+# atasque pidiendo herramientas encadenaría llamadas indefinidamente. 4 da
+# margen para consultar dos comunas distintas y aún así responder.
+MAX_ITERACIONES_TOOLS_CHATBOT = 4
+
+# Techo de tiempo para responder un mensaje, contando TODAS las vueltas del
+# bucle de tools. Sin esto, 4 llamadas secuenciales de 30s con 2 reintentos
+# cada una pueden sumar varios minutos: el navegador se rinde mucho antes
+# (45s en ApiClient) y el usuario ve un error de red mientras el servidor
+# sigue facturando llamadas que ya nadie va a leer. Debe quedar por debajo
+# del timeout del cliente.
+PRESUPUESTO_TOTAL_CHATBOT_SEGUNDOS = 40.0
+
 # Lista cerrada de botones/acciones que el modelo puede sugerir a la UI.
 # El frontend (chatbot_page.dart) ya sabe pintar botones con estos textos
 # exactos; cualquier otra acción que devuelva el modelo se filtra en el

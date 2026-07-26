@@ -51,6 +51,7 @@ async def post_chatbot(payload: MensajeChatbot, request: Request):
             mensaje=payload.mensaje,
             historial=historial,
             contexto=chatbot_context.serializar(contexto),
+            sector_index=request.app.state.sector_index,
         )
     except ChatbotNoConfigurado:
         raise HTTPException(status_code=503, detail="El chatbot no está configurado en este servidor.")
