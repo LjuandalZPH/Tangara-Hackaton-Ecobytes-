@@ -1,86 +1,99 @@
-# 🌿 EcoBytes
+# EcoBytes
 
-> *Porque el aire que respiras también merece ser visible.*
+Plataforma de monitoreo de calidad del aire para Cali, Colombia. Convierte los datos que la red de sensores ciudadanos Tángara recolecta minuto a minuto en un mapa legible, un perfil histórico por comuna y un asistente que responde preguntas sobre el aire en lenguaje corriente.
 
-EcoBytes es una plataforma de monitoreo de calidad del aire diseñada para hacer que los datos ambientales urbanos sean accesibles, comprensibles y accionables para cualquier persona — no solo para científicos o funcionarios públicos.
+Desarrollado por el equipo **Bit&Volt Labs** para la Tángara Hackathon 2026.
 
-Desarrollado por el equipo **Bit&Volt Labs** para la **Tángara Hackathon**.
+## El problema
 
----
+Cali cuenta con una red de más de veinte sensores ciudadanos de calidad del aire operando desde 2021, con mediciones reales de material particulado fino (PM2.5), CO2 y humedad. Esos datos existen y son técnicamente sólidos, pero viven en una infraestructura pensada para análisis de datos, no para consulta directa: sin agregación por zona de la ciudad, sin clasificación en términos que un no especialista pueda interpretar de un vistazo, y sin un canal para hacer una pregunta en español y recibir una respuesta concreta.
 
-## ¿Qué problema resuelve?
+EcoBytes no instala sensores nuevos ni construye un pipeline de datos propio. Toma exactamente lo que la red Tángara ya mide y lo convierte en tres formas de acceso que no exigen entender ClickHouse, SQL, ni qué es un percentil:
 
-En Cali los datos de calidad del aire existen — la red Tángara lleva años midiendo minuto a minuto en barrios, colegios y comunidades donde ninguna entidad oficial tiene presencia. Pero esa información vive en una base de datos técnica, difícil de interpretar para alguien que no es científico de datos.
+- **Un mapa** de las 22 comunas de Cali, coloreado en verde, amarillo, rojo o gris según qué tan segura de respirar es el aire ahora mismo.
+- **Un perfil histórico** por comuna: cómo ha estado el aire en el último año, qué tan seguido se superó el límite recomendado por la Organización Mundial de la Salud, y en qué meses fue mejor o peor.
+- **Un asistente conversacional** que responde en lenguaje natural — "¿cómo está el aire en la comuna 17 hoy?" — usando siempre las cifras reales del momento, nunca una estimación inventada.
 
-EcoBytes cierra esa brecha apoyándose directamente en el pipeline analítico que ya existe detrás de Tángara (InfluxDB → ClickHouse, arquitectura Medallón), en vez de reconstruirlo desde cero.
+El mismo contenido está disponible también desde un kiosko físico con pantalla táctil, para quienes no tienen o no quieren usar un navegador — pensado como punto de consulta en un espacio público.
 
----
+## Por qué importa
 
-## ¿Qué hace?
+El material particulado fino (PM2.5) es el contaminante del aire con mayor evidencia de daño a la salud humana: penetra hasta el torrente sanguíneo, agrava enfermedades respiratorias y cardiovasculares, y su exposición prolongada se asocia con menor esperanza de vida. La Organización Mundial de la Salud fija umbrales de referencia — y EcoBytes clasifica cada comuna exactamente contra esos umbrales, sin inventar una escala propia.
 
-### 🗺️ Mapa por sectores
+Que un dato exista en una base de datos no significa que esté al alcance de quien lo necesita. Un padre decidiendo si su hijo puede jugar afuera, un ciclista planeando su ruta, un docente explicando el tema en clase, o un funcionario público preparando un reporte, no necesitan una consulta SQL: necesitan una respuesta directa, honesta sobre lo que no se sabe (una comuna sin sensores cercanos se muestra explícitamente como "sin datos", nunca como "aire limpio"), y en su idioma. Esa es la brecha que este proyecto cierra: no la de recolectar datos, sino la de hacerlos legibles y accionables.
 
-Un mapa de Cali donde cada sector se colorea según su calidad del aire actual — verde, amarillo o rojo — con datos que se refrescan automáticamente. Tocar un sector muestra sus valores exactos de PM2.5, CO2 y humedad.
+## Para quién es
 
-### 📍 El riesgo en tu dirección
+- Personas que quieren saber si el aire de su comuna es seguro hoy.
+- Padres, cuidadores y personas con condiciones respiratorias que necesitan un perfil de riesgo por zona.
+- Docentes y estudiantes que buscan una referencia clara sobre calidad del aire y salud.
+- Periodistas e investigadores que necesitan datos locales verificables, con su fuente y su metodología a la vista.
+- Funcionarios públicos y organizaciones de la sociedad civil que necesitan comunicar el estado del aire sin depender de un intermediario técnico.
 
-Eliges tu barrio y recibes un perfil histórico de calidad del aire para ese punto: peor mes, mejor mes, promedio anual y cuántos días al año se supera la norma OMS. Pensado para padres, pacientes con condiciones respiratorias y cualquiera que quiera saber qué tan seguro es el aire donde vive.
+## Cómo está compuesto
 
-### 📚 Entiende lo que respiras
+| Componente | Qué es | Documentación |
+| --- | --- | --- |
+| Backend | Servicio FastAPI, sin base de datos propia, que consulta ClickHouse (capa Plata de Tángara) en modo lectura y expone seis endpoints | [`docs/backend.md`](./docs/backend.md) |
+| Frontend | Aplicación Flutter compilada a web: landing, mapa, detalle de comuna, contenido educativo y chatbot | [`docs/frontend.md`](./docs/frontend.md) |
+| Kiosko ESP32 | Firmware embebido para un dispositivo con pantalla táctil, cliente del mismo backend | [`docs/firmware-esp32-kiosko.md`](./docs/firmware-esp32-kiosko.md) |
+| Arquitectura general | Visión de conjunto, diagramas y decisiones de diseño | [`docs/arquitectura.md`](./docs/arquitectura.md) |
+| Backlog | Estado real de cada funcionalidad, reconstruido desde el código | [`docs/backlog.md`](./docs/backlog.md) |
 
-Una pantalla clara que explica qué son el PM2.5 y el CO2, cómo afectan la salud y qué acciones concretas se pueden tomar — sin tecnicismos innecesarios.
+## Arquitectura de despliegue, en resumen
 
-### 📟 Kiosko físico (planificado)
+El backend es autoalojado y se publica a internet mediante **Tailscale Funnel** (una URL HTTPS pública sin necesidad de abrir puertos ni gestionar certificados manualmente). El frontend se despliega como sitio estático en **Vercel**, compilado apuntando a esa misma URL. El kiosko ESP32 es un tercer cliente HTTP independiente, que consume el backend por la misma vía. Ningún componente mantiene una base de datos propia de sensores: toda la telemetría se lee, en tiempo real y en modo exclusivamente lectura, de la capa Plata del pipeline de Tángara en ClickHouse. Detalle completo en [`docs/arquitectura.md`](./docs/arquitectura.md).
 
-Un ESP32 con pantalla táctil pensado como punto de consulta físico: mismo flujo landing → detalle de sector que la web, como segundo cliente del mismo backend. Todavía en diseño, sin código — ver [`08-Arquitectura-ESP32.md`](./08-Arquitectura-ESP32.md).
+## Cómo instalarlo y correrlo
 
----
+### Requisitos
 
-## ¿Para quién es?
+- Docker y Docker Compose, para levantar backend y frontend sin instalar Python ni Flutter localmente.
+- Credenciales de acceso a ClickHouse (capa `tangara_plata` del pipeline de Tángara).
+- Opcional: una API key de OpenAI, solo si se quiere el chatbot activo.
 
-- **Ciudadanos** que quieren saber si el aire de su barrio es seguro hoy.
-- **Padres, cuidadores y pacientes vulnerables** que necesitan un perfil de riesgo por dirección.
-- **Estudiantes** que aprenden sobre medio ambiente de forma clara.
-- **Investigadores y periodistas** que necesitan datos locales confiables y accesibles.
-- **Ciclistas y deportistas** que planifican sus rutas según la calidad del aire.
+### Configuración mínima
 
----
+```bash
+# Backend
+cp Backend/.env.example Backend/.env
+# completar CLICKHOUSE_HOST / CLICKHOUSE_USER / CLICKHOUSE_PASSWORD / CORS_ORIGINS
 
-## Cómo está construido
+# Frontend
+cp Frontend/ecobytes/.env.example Frontend/ecobytes/.env
+# completar API_BASE_URL (por defecto http://localhost:8000)
+```
 
-EcoBytes se diseñó con un principio simple: **velocidad de desarrollo sobre completitud de features.** Eso se traduce en un alcance enfocado en el valor central del producto:
+Ninguno de los dos `.env` se versiona (están en `.gitignore`); cada variable está documentada con su propósito en `docs/backend.md` y `docs/frontend.md`, sin valores reales.
 
-- **Acceso abierto** — cualquier persona entra y usa la app sin crear una cuenta ni iniciar sesión.
-- **Geometría simple** — los sectores de Cali son un conjunto fijo de polígonos; se resuelven con un archivo GeoJSON estático más una librería de geometría (`shapely`).
-- **Datos frescos por refresco periódico** — el mapa se actualiza automáticamente cada 30-60 segundos.
-- **Una sola aplicación Flutter, compilada exclusivamente a web** — accesible desde el navegador tanto en desktop como en teléfono, sin apps que instalar.
-- **ClickHouse como única fuente de datos de sensores** — se reutiliza directamente la capa Plata del pipeline Tángara (normalizada, aunque no agregada — la agregación la resuelve el propio backend de EcoBytes), sin duplicar ingesta ni almacenamiento propio.
+### Levantar el proyecto
 
-**Stack:**
+El repositorio incluye tres archivos `docker-compose`, en la raíz:
 
-| Capa | Tecnología |
-| --- | --- |
-| Datos históricos | InfluxDB → ClickHouse (pipeline Tángara, arquitectura Medallón) |
-| Backend | FastAPI (Python), un único servicio sin estado propio |
-| Frontend | Flutter (Dart), compilado solo a web |
+```bash
+# Aplicación completa (backend + frontend)
+docker compose --env-file Frontend/ecobytes/.env up
 
-Documentación técnica completa:
+# Solo backend
+docker compose -f docker-compose.backend.yml up
 
-1. [`01-Arquitectura.md`](./01-Arquitectura.md) — visión general del sistema y decisiones de diseño.
-2. [`02-Backlog.md`](./02-Backlog.md) — épicas e historias de usuario.
-3. [`03-Arquitectura-Backend.md`](./03-Arquitectura-Backend.md) — diseño detallado del servicio FastAPI.
-4. [`04-Arquitectura-Frontend.md`](./04-Arquitectura-Frontend.md) — diseño detallado de la app Flutter.
-5. [`05-Discrepancias.md`](./05-Discrepancias.md) — diferencias entre esta arquitectura objetivo y el estado real del código.
-6. [`06-Plan-de-Accion.md`](./06-Plan-de-Accion.md) — plan concreto, con dependencias y prioridades, para cerrar esas diferencias.
-7. [`07-Integracion-Backend-Frontend.md`](./07-Integracion-Backend-Frontend.md) — estado real de la integración backend↔frontend.
-8. [`08-Arquitectura-ESP32.md`](./08-Arquitectura-ESP32.md) — diseño del kiosko físico ESP32 (planificado, sin código todavía).
+# Solo frontend, contra un backend que ya corre en otro lugar
+docker compose --env-file Frontend/ecobytes/.env -f docker-compose.frontend.yml up
+```
 
----
+Backend disponible en `http://localhost:8000` (documentación interactiva en `/docs`), frontend en `http://localhost:8080`.
 
-## El equipo
+### Kiosko ESP32 (opcional)
 
-**Bit&Volt Labs** es un equipo de cinco estudiantes de ingeniería de la Universidad del Valle (Cali, Colombia), con perfiles en Ingeniería de Sistemas e Ingeniería Electrónica.
+Requiere el hardware físico (ESP32-2432S028R con pantalla táctil) y Arduino IDE. Antes de compilar:
 
----
+```bash
+cp Firmware/esp32-kiosko/secrets.h.example Firmware/esp32-kiosko/secrets.h
+# completar kBackendBaseUrl con la URL pública del backend
+```
 
-*Hecho con 💚 en Cali, Colombia.*
+Pasos completos de compilación y flasheo en [`docs/firmware-esp32-kiosko.md`](./docs/firmware-esp32-kiosko.md).
+
+## Equipo
+
+**Bit&Volt Labs** — equipo de cinco estudiantes de ingeniería de la Universidad del Valle (Cali, Colombia), con perfiles en Ingeniería de Sistemas e Ingeniería Electrónica. Proyecto presentado en la Tángara Hackathon 2026, "Habla y Crea con los Datos de Calidad del Aire de Cali".

@@ -127,7 +127,7 @@ lv_obj_t* construirPantalla() {
 
   Serial.println("ui_config: escaneando redes WiFi...");
   WiFi.mode(WIFI_STA);
-  // Mitigacion de brownout (ver 06-Plan-de-Accion.md §5.3/§5.6): el escaneo
+  // Mitigacion de brownout: el escaneo
   // usa la radio a full power igual que una conexion -- sin esto corria
   // sin la reduccion de TX power que se aplica en net::conectarWifi(),
   // reintroduciendo la misma inestabilidad vista antes.

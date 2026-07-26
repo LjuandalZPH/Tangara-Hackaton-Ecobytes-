@@ -20,8 +20,7 @@
 
 #include <LovyanGFX.hpp>
 
-// Cambiado de Panel_ILI9341 a Panel_ST7789 (2026-07-25, ver
-// 06-Plan-de-Accion.md §5.3): esta unidad concreta tiene DOS puertos USB
+// Cambiado de Panel_ILI9341 a Panel_ST7789: esta unidad concreta tiene DOS puertos USB
 // (Micro-USB + USB-C), lo que segun la comunidad identifica la variante
 // ST7789 del ESP32-2432S028R (la variante ILI9341 trae un solo
 // Micro-USB) -- no hay forma de distinguirlas por software/ID de chip

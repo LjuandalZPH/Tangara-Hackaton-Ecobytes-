@@ -60,7 +60,7 @@ lv_obj_t* construirPantalla() {
 
   // --- Header: agregados de ciudad (se completa mas abajo, despues del
   // fetch) + gesto de "mantener presionado ~2s" para volver al portal de
-  // configuracion (ver 08-Arquitectura-ESP32.md §4.0, "acceso posterior").
+  // configuracion (ver docs/firmware-esp32-kiosko.md, "acceso posterior").
   lv_obj_t* header = lv_obj_create(pantalla);
   lv_obj_set_size(header, lv_pct(100), 60);
   lv_obj_add_flag(header, LV_OBJ_FLAG_CLICKABLE);
@@ -75,8 +75,8 @@ lv_obj_t* construirPantalla() {
   lv_obj_set_width(lista, lv_pct(100));
   lv_obj_set_flex_grow(lista, 1);
 
-  // Fetch sincronico/bloqueante -- ~35-40s (ver 06-Plan-de-Accion.md
-  // §5.1). La pantallaCarga de arriba es lo unico que se ve mientras esto
+  // Fetch sincronico/bloqueante -- ~35-40s (ver docs/firmware-esp32-kiosko.md).
+  // La pantallaCarga de arriba es lo unico que se ve mientras esto
   // corre (ver comentario al principio de la funcion).
   const storage::ConfigRed config = storage::cargarConfigRed();
   const JsonDocument filtro = net::construirFiltroSectores();

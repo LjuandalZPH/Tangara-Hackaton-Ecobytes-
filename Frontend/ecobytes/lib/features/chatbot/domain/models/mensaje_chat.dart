@@ -2,7 +2,7 @@
 ///
 /// El servidor no guarda estado: el historial vive aquí, en el cliente, y
 /// viaja completo en cada petición a `POST /chatbot` (ver
-/// 03-Arquitectura-Backend.md §3).
+/// docs/backend.md).
 class MensajeChat {
   const MensajeChat({
     required this.texto,

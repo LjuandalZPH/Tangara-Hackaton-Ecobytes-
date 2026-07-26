@@ -7,12 +7,12 @@
 #include "ui_config.h"
 #include "ui_landing.h"
 
-// T-07.2/T-07.3/T-07.4 (02-Backlog.md EPI-06): estructura del sketch +
-// smoke test con LVGL v8 + LovyanGFX (T-07.2, panel ST7789, no ILI9341,
+// Estructura del sketch +
+// smoke test con LVGL v8 + LovyanGFX (panel ST7789, no ILI9341,
 // ver LGFX_Config.h) + portal de configuracion tactil (T-07.3,
 // ui_config.cpp) + pantalla Landing con datos reales (T-07.4,
 // ui_landing.cpp). Los tres, confirmados en hardware real -- detalle de
-// los bugs encontrados y corregidos en 06-Plan-de-Accion.md §5.2-5.6.
+// los bugs encontrados y corregidos en docs/firmware-esp32-kiosko.md.
 //
 // Toolchain: Arduino IDE. Placa (Tools > Board): "ESP32 Dev Module".
 // Requiere ArduinoJson v7.x, "lvgl" (kisvegabor) v8.x y "LovyanGFX"
@@ -36,7 +36,7 @@ constexpr uint16_t kPantallaAlto = 240;
 // Bajado de 40 a 20 lineas (2026-07-25): estos arrays son estaticos
 // (.bss), no heap -- a 40 lineas sumaban ~50KB que, junto al pool estatico
 // de LVGL (lv_conf.h, LV_MEM_SIZE), desbordaban dram0_0_seg por ~27KB en
-// el link (ver detalle en 06-Plan-de-Accion.md). A 20 lineas son ~25KB,
+// el link (ver detalle en docs/firmware-esp32-kiosko.md). A 20 lineas son ~25KB,
 // suficiente margen para las pantallas actuales; el costo es mas
 // llamadas a lvglFlushCb por refresco, sin impacto visible con SPI a
 // 40MHz en pantallas de datos (no animaciones).
@@ -100,7 +100,7 @@ void inicializarDisplay() {
 // arranques siguientes se restaura sin volver a pedirle al usuario que
 // toque los 4 puntos.
 //
-// CORREGIDO (2026-07-25, ver 06-Plan-de-Accion.md §5.6): la primera
+// CORREGIDO: la primera
 // version de esto usaba un array de 4 elementos -- LGFXBase.hpp confirma
 // que calibrateTouch()/setTouchCalibrate() necesitan un array de **8**
 // (`memcpy(parameters, orig, sizeof(uint16_t) * 8)`), no 4. Con 4, la

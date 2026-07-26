@@ -3,12 +3,11 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
-// Cliente HTTP para GET /sectors, con el patron validado en el spike T-07.1
-// (ver 06-Plan-de-Accion.md §5.1): filtra "geometry" con
-// DeserializationOption::Filter y parsea en streaming directo desde el
-// WiFiClient, para que el pico de memoria nunca incluya el JSON completo sin
-// filtrar (~774 KB, ver 08-Arquitectura-ESP32.md §8). Reusado por
-// ui_landing.cpp (T-07.4) y por el smoke test de esp32-kiosko.ino.
+// Cliente HTTP para GET /sectors, con el patron validado en hardware real:
+// filtra "geometry" con DeserializationOption::Filter y parsea en streaming
+// directo desde el WiFiClient, para que el pico de memoria nunca incluya el
+// JSON completo sin filtrar (~774 KB, ver docs/firmware-esp32-kiosko.md).
+// Reusado por ui_landing.cpp y por el smoke test de esp32-kiosko.ino.
 
 namespace net {
 

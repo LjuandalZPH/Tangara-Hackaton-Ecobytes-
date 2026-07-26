@@ -1,23 +1,20 @@
 # Firmware ESP32 — kiosko EcoBytes
 
-Ver diseño completo en [`../../08-Arquitectura-ESP32.md`](../../08-Arquitectura-ESP32.md).
-Estado actual (`02-Backlog.md`, EPI-06):
+Ver diseño completo en [`../../docs/firmware-esp32-kiosko.md`](../../docs/firmware-esp32-kiosko.md).
+Estado actual:
 
 - **T-07.1 (spike, ✅ hecho):** midió heap real al pedir `GET /sectors`
   filtrando el campo `geometry` con ArduinoJson — el paso bloqueante antes de
-  construir cualquier pantalla. Resultado y números reales en
-  `06-Plan-de-Accion.md` §5.1. Esa lógica de red ya no vive suelta en el
+  construir cualquier pantalla. Esa lógica de red ya no vive suelta en el
   `.ino`: se migró a `net_client.h`/`.cpp` sin cambiar su comportamiento.
 - **T-07.2 (estructura + smoke test, ✅ hecho, 2026-07-25):** estructura de
-  archivos del sketch (ver §6 de `08-Arquitectura-ESP32.md`) + primer
+  archivos del sketch (ver `docs/firmware-esp32-kiosko.md`) + primer
   arranque real de LVGL v8 + LovyanGFX sobre el panel **ST7789**/touch
   XPT2046 (no ILI9341 -- ver nota abajo), confirmado en hardware real:
   WiFi conecta, el fetch de `/sectors` completa (`Sectores parseados: 22`)
   y la Landing se dibuja limpia, sin reinicios. Detalle de los tres
   problemas reales que hubo que resolver (overflow de DRAM estática,
-  overflow de flash, panel mal identificado) en `06-Plan-de-Accion.md`
-  §5.2-5.4. Pantallas de verdad (T-07.3 en adelante) siguen como
-  placeholders en `ui_config.cpp`/`ui_landing.cpp`/`ui_details.cpp`.
+  overflow de flash, panel mal identificado) en `docs/firmware-esp32-kiosko.md`.
 
   **⚠️ Esta unidad es la variante ST7789 del ESP32-2432S028R, no ILI9341**
   (se distingue por tener puerto USB-C *además* del Micro-USB) --
@@ -31,7 +28,7 @@ Estado actual (`02-Backlog.md`, EPI-06):
   reiniciar hacia el flujo normal. Confirmado en hardware real: interfaz
   limpia, calibración de touch precisa, wizard completo (red → password →
   URL → conectar) sin errores ni reinicios. En el camino aparecieron y se
-  corrigieron dos bugs reales (detalle en `06-Plan-de-Accion.md` §5.6):
+  corrigieron dos bugs reales:
   1. `storage::CalibracionTouch` usaba un array de 4 `uint16_t`, pero
      `LGFX_Device::calibrateTouch()`/`setTouchCalibrate()` de LovyanGFX
      necesitan un array de **8** (verificado contra el código fuente real
@@ -42,7 +39,7 @@ Estado actual (`02-Backlog.md`, EPI-06):
      `net::conectarWifi` (`net_client.cpp`).
 
   De paso se encontró que `WiFi.setTxPower(WIFI_POWER_2dBm)` (mitigación
-  de brownout de T-07.2, ver §5.3) solo se aplicaba después de conectar
+  de brownout) solo se aplicaba después de conectar
   con éxito — ahora también corre antes del escaneo de redes y de cada
   intento de conexión, para cubrir todo el camino donde antes se vio
   inestabilidad. **`secrets.h` volvió a tener un uso real** (parcial): ya
@@ -77,10 +74,8 @@ tailnet** (no existe cliente Tailscale para Arduino/ESP32), así que no sirve
 apuntar a la IP `100.x.y.z` del backend — hay que exponerlo con
 **[Tailscale Funnel](https://tailscale.com/kb/1223/funnel)**, que publica el
 servicio en una URL HTTPS pública normal, alcanzable desde cualquier WiFi con
-internet (el ESP32 no necesita estar en la tailnet para esto). Esto invalida
-el supuesto original de `08-Arquitectura-ESP32.md` §10 ("alcanzable por IP
-dentro de la misma LAN") — pendiente de corregir ese documento una vez se
-confirme que este es el setup definitivo, no solo el de la hackathon.
+internet (el ESP32 no necesita estar en la tailnet para esto). Ver
+`docs/firmware-esp32-kiosko.md` para el protocolo de comunicación completo.
 
 **En el servidor donde corre `docker compose up` (el backend escucha en el
 puerto 8000, ver `docker-compose.yml`):**
@@ -130,22 +125,19 @@ CAs con `setCACertBundle()`).
    `partitions.csv` versionado en esta misma carpeta (una sola partición de
    app de 3 MB, sin slots de OTA que no usamos) — pero el IDE solo lo usa
    *y* saca el techo de tamaño de "Default" (1.25 MB, insuficiente para
-   LVGL+LovyanGFX+WiFi+ArduinoJson) si el menú está en "Custom". Ver
-   `06-Plan-de-Accion.md` §5.2 para el detalle de por qué hace falta esto.
+   LVGL+LovyanGFX+WiFi+ArduinoJson) si el menú está en "Custom".
 4. **Library Manager** (`Sketch → Include Library → Manage Libraries...`),
    instalar:
    - **"ArduinoJson"** de Benoit Blanchon, versión **7.x** (no la 6, la API
      de filtro que usamos es la de v7).
-   - **"lvgl"** de kisvegabor, versión **8.x** (no la 9 — el diseño en
-     `08-Arquitectura-ESP32.md` §7 está escrito contra la API v8, que difiere
-     bastante de v9).
+   - **"lvgl"** de kisvegabor, versión **8.x** (no la 9 — todo el firmware
+     está escrito contra la API v8, que difiere bastante de v9).
    - **"LovyanGFX"** de lovyan03 (última versión, no hay pin de versión
      específica documentado todavía).
 5. **`lv_conf.h` ya está versionado en esta carpeta** — no hay que copiarlo
-   a ningún lado ni configurarlo a mano (a diferencia de lo que se pensaba
-   al principio de T-07.2, ver la corrección en `08-Arquitectura-ESP32.md`
-   §7: el build de Arduino agrega la carpeta del sketch al include path
-   siempre, así que un `lv_conf.h` acá mismo alcanza).
+   a ningún lado ni configurarlo a mano: el build de Arduino agrega la
+   carpeta del sketch al include path siempre, así que un `lv_conf.h` acá
+   mismo alcanza.
 6. Abrir esta carpeta (`Firmware/esp32-kiosko/`) en Arduino IDE — debe abrir
    `esp32-kiosko.ino` como sketch principal, con el resto de los `.h`/`.cpp`
    (`net_client`, `storage_prefs`, `ui_config`, `ui_landing`, `ui_details`,
@@ -188,8 +180,7 @@ CAs con `setCACertBundle()`).
   calentando; lo que importa es que se estabilice, no que seguir bajando).
 - `Sectores parseados: 22` en cada fetch (el dataset completo de comunas).
 
-Resultado real y números anotados en `06-Plan-de-Accion.md` §5.1 y
-`02-Backlog.md` (T-07.1).
+Resultado real y números anotados en `docs/firmware-esp32-kiosko.md` y `docs/backlog.md`.
 
 ## Qué hace falta para considerar el smoke test T-07.2 exitoso
 
@@ -208,11 +199,9 @@ Resultado real y números anotados en `06-Plan-de-Accion.md` §5.1 y
   red a `net_client.cpp` no le cambió el comportamiento.
 - Comparar los `[heap]` impresos contra los de T-07.1: ahora incluyen LVGL +
   LovyanGFX enlazados (~50 KB de buffer adicional presupuestados en
-  `08-Arquitectura-ESP32.md` §9) — si el heap libre después de inicializar
+  `docs/firmware-esp32-kiosko.md`) — si el heap libre después de inicializar
   LVGL cae peligrosamente cerca de lo que necesita el fetch, es la señal de
   que el presupuesto de memoria ya no alcanza con la UI real encima.
 
 Este documento no se actualiza solo — una vez corrido en hardware real,
-anotar el resultado en `02-Backlog.md` (T-07.2) y `06-Plan-de-Accion.md` §5,
-y recién ahí seguir con el resto de "Pendiente" de `08-Arquitectura-ESP32.md`
-§11 (pantalla de configuración T-07.3, Landing T-07.4, Details T-07.5/T-07.6).
+anotar el resultado aquí y en `docs/backlog.md`.

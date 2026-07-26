@@ -18,10 +18,10 @@ Las **22 comunas oficiales de Santiago de Cali**, en WGS84 (EPSG:4326).
 - **Esquema:** cada feature es un `MultiPolygon` con las propiedades
   `comcodigo` (`"01"`..`"22"`) y `comnombre` (`"Comuna 01"`..`"Comuna 22"`).
   `services/geo.py` las normaliza al contrato público de la API
-  (`id: "comuna-2"`, `nombre: "Comuna 2"`) — ver `03-Arquitectura-Backend.md` §3.
+  (`id: "comuna-2"`, `nombre: "Comuna 2"`) — ver `docs/backend.md`.
 
 Este archivo va versionado en el repo; cualquier cambio a los polígonos pasa
-por PR (`03-Arquitectura-Backend.md` §8).
+por PR.
 
 > **Granularidad:** si más adelante se necesita nivel de barrio, la misma capa
 > `dapm` de IDESC probablemente expone una capa equivalente de barrios. Hoy el

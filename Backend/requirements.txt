@@ -11,7 +11,7 @@ clickhouse-connect[async]==1.5.0
 
 # Geometría — point-in-polygon sobre sectores.geojson.
 # No se usa pygeohash: la columna `geo` se decodifica con geohashDecode()
-# en la propia query de ClickHouse (ver 03-Arquitectura-Backend.md §4).
+# en la propia query de ClickHouse (ver docs/backend.md).
 shapely==2.1.2
 
 # LLM — chatbot ambiental (POST /chatbot, services/llm_client.py).

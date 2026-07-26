@@ -27,7 +27,7 @@
 #define LV_COLOR_DEPTH 16
 
 /*Swap the 2 bytes of RGB565 color. Useful if the display has an 8-bit interface (e.g. SPI)*/
-// Cambiado de 0 a 1 (2026-07-25, ver 06-Plan-de-Accion.md §5.3): con
+// Cambiado de 0 a 1: con
 // LGFX_Config.h (LovyanGFX) + lvglFlushCb pasando lv_color_t->full directo
 // a lcd.pushImage() como rgb565_t*, sin el swap cada pixel llegaba con los
 // bytes invertidos -- ruido tipo "estatica" en pantalla, no un color

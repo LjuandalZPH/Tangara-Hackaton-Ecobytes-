@@ -2,7 +2,7 @@
 
 #include <lvgl.h>
 
-// T-07.3: portal de configuracion tactil. Wizard de 3 pasos en la misma
+// Portal de configuracion tactil. Wizard de 3 pasos en la misma
 // pantalla (mostrando/ocultando contenedores, no pantallas separadas --
 // 320x240 no alcanza para mostrar todo el formulario + teclado a la vez):
 //   1. Elegir red (lv_dropdown poblado con WiFi.scanNetworks()).
@@ -14,11 +14,10 @@
 // LovyanGFX (lcd.calibrateTouch()), no un widget LVGL, y corre en
 // esp32-kiosko.ino antes de cargar cualquier pantalla (si no, ni tocar el
 // dropdown/teclado de este wizard seria confiable). Ver
-// 08-Arquitectura-ESP32.md §4.0.
+// docs/firmware-esp32-kiosko.md.
 //
 // Acceso posterior (para cambiar de red): mantener presionado el header de
-// la Landing ~2s -- ese gesto se implementa en ui_landing.cpp (T-07.4),
-// todavia no existe.
+// la Landing ~2s -- ese gesto se implementa en ui_landing.cpp.
 
 namespace ui_config {
 

@@ -1,9 +1,9 @@
 # Name,   Type, SubType, Offset,  Size, Flags
 #
 # Partition table custom para el kiosko ESP32 EcoBytes (ver
-# 06-Plan-de-Accion.md §5.2). Arduino IDE usa este archivo en vez del
+# docs/firmware-esp32-kiosko.md). Arduino IDE usa este archivo en vez del
 # esquema por defecto del board porque vive directo en la carpeta del
-# sketch (mismo mecanismo que lv_conf.h, ver 08-Arquitectura-ESP32.md §6).
+# sketch (mismo mecanismo que lv_conf.h).
 #
 # Por que no el esquema "Default" (dos particiones app de 1.25MB c/u +
 # spiffs): ese reparto es para soportar actualizacion OTA con rollback,

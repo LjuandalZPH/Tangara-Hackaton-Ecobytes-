@@ -92,7 +92,7 @@ class Sector {
   /// dato no es actual, pero **no** garantiza que `pm25Promedio` sea nulo — un
   /// sector con sensores cuya última lectura es vieja llega en gris y con el
   /// último valor conocido (ver `routers/sectors.py` y
-  /// `07-Integracion-Backend-Frontend.md` §3).
+  /// `docs/backend.md`).
   bool get tieneDatos => !sinDatosRecientes && pm25Promedio != null;
 
   factory Sector.fromJson(Map<String, dynamic> json) {

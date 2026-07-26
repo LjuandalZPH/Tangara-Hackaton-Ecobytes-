@@ -28,7 +28,7 @@ bool conectarWifi(const char* ssid, const char* password, unsigned long timeoutM
   delay(100);
   WiFi.mode(WIFI_STA);
 
-  // Mitigacion de brownout (ver 06-Plan-de-Accion.md §5.3): antes esto
+  // Mitigacion de brownout: antes esto
   // solo se aplicaba DESPUES de conectar con exito, en esp32-kiosko.ino --
   // un gap real, porque el escaneo de redes de ui_config.cpp y los
   // reintentos de conexion (que es donde mas se vio inestabilidad en
@@ -64,10 +64,10 @@ namespace {
 // demasiado largo. Patron recomendado por ArduinoJson para "streams
 // lentos" (https://arduinojson.org/v7/how-to/deserialize-a-slow-stream/).
 //
-// kStallMaxMs subido de 5000 a 12000 en T-07.1: con 5000 el relay de Funnel
+// kStallMaxMs subido de 5000 a 12000: con 5000 el relay de Funnel
 // dejaba huecos de silencio mas largos a mitad de transferencia en 2-3 de
 // cada 5 fetches, cortando el JSON (IncompleteInput) aunque la conexion
-// seguia viva -- ver 06-Plan-de-Accion.md §5.1.
+// seguia viva.
 class LectorResiliente {
  public:
   LectorResiliente(WiFiClient& stream, HTTPClient& http)
@@ -111,7 +111,7 @@ String normalizarBaseUrl(const String& backendUrl) {
 }
 
 // GET simple para payloads chicos (~2-3KB `/sectors/{id}`, <1KB
-// `/risk/{sector}` -- ver 08-Arquitectura-ESP32.md §9): a diferencia de
+// `/risk/{sector}` -- ver docs/firmware-esp32-kiosko.md): a diferencia de
 // fetchSectores() (774KB, streaming + filtro), estos entran comodos en un
 // String antes de parsear, sin necesitar LectorResiliente ni el filtro de
 // deserializacion.

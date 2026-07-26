@@ -62,8 +62,8 @@ void construirTabResumen(lv_obj_t* tab, const char* sectorId, const String& back
   crearEtiqueta(tab, "CO2: " + formatearOSinDato(doc["co2_promedio"], "ppm", 0));
   crearEtiqueta(tab, "Humedad: " + formatearOSinDato(doc["hum_promedio"], "%", 0));
 
-  // "Ultima lectura hace X" (08-Arquitectura-ESP32.md §4.2) depende de
-  // hora real vs. NTP (T-07.8, todavia no implementado) -- mientras
+  // "Ultima lectura hace X" (ver docs/firmware-esp32-kiosko.md) depende de
+  // hora real vs. NTP (todavia no implementado) -- mientras
   // tanto, mismo criterio de fallback que ya documenta ese parrafo:
   // mostrar el timestamp crudo del backend sin relativizar.
   const char* ultimaLectura = doc["ultima_lectura"] | nullptr;
@@ -87,7 +87,7 @@ void construirTabResumen(lv_obj_t* tab, const char* sectorId, const String& back
   for (JsonObject punto : historial) {
     JsonVariantConst valor = punto["pm25_promedio"];
     if (valor.isNull()) {
-      // No inventar puntos que faltan (08-Arquitectura-ESP32.md §5.1) --
+      // No inventar puntos que faltan --
       // LV_CHART_POINT_NONE deja un hueco visible en la linea en vez de
       // interpolar o poner un 0 falso.
       lv_chart_set_next_value(chart, serie, LV_CHART_POINT_NONE);
