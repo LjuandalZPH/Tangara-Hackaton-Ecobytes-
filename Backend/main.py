@@ -14,8 +14,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from routers import education, risk, sectors
-from services import clickhouse_client
+from routers import chatbot, education, risk, sectors
+from services import clickhouse_client, llm_client
 from services.geo import SectorIndex
 
 GEOJSON_PATH = Path(__file__).resolve().parent / "data" / "sectores.geojson"
@@ -56,6 +56,7 @@ app.add_middleware(
 app.include_router(sectors.router, prefix="/sectors", tags=["Sectores"])
 app.include_router(risk.router, prefix="/risk", tags=["Riesgo"])
 app.include_router(education.router, prefix="/education", tags=["Educación"])
+app.include_router(chatbot.router, prefix="/chatbot", tags=["Chatbot"])
 
 
 # ─────────────────────────────────────────
@@ -76,8 +77,9 @@ async def on_startup():
 
 @app.on_event("shutdown")
 async def on_shutdown():
-    """Cierra la conexión con ClickHouse al apagar el servicio."""
+    """Cierra las conexiones salientes (ClickHouse y OpenAI) al apagar el servicio."""
     await clickhouse_client.cerrar_cliente()
+    await llm_client.cerrar_cliente()
 
 
 # ─────────────────────────────────────────
