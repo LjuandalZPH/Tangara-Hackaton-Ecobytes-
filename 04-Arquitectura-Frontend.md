@@ -165,7 +165,17 @@ Inicio | Mapa | Aprende | Chatbot
 
 El detalle de sector (§6) se alcanza únicamente desde el mapa — no aparece como ítem de navegación propio.
 
-**Decisión (2026-07-23):** landing y chatbot se conservan como parte de la navegación principal — respaldados por el Figma del equipo, no son scaffold heredado. El chatbot mantiene su lugar en el producto (nav + pantalla propia), pero su implementación real (conexión a un backend/LLM) está en pausa hasta que un miembro del equipo la retome — no se está tocando ese alcance ni ese código por ahora. Ver `05-Discrepancias.md`.
+**Decisión (2026-07-23):** landing y chatbot se conservan como parte de la navegación principal — respaldados por el Figma del equipo, no son scaffold heredado.
+
+**Actualización (2026-07-25): la pausa del chatbot terminó, y quedó conectado de punta a punta.** `POST /chatbot` (ver `03-Arquitectura-Backend.md` §3) recibe `{mensaje, historial}` y devuelve `{respuesta, acciones, contexto_actualizado}`. Del lado Flutter:
+
+- `ChatbotProvider` (`features/chatbot/presentation/providers/`) mantiene la conversación, con el mismo patrón que `SectorsProvider` pero **sin polling** — aquí solo se habla cuando el usuario escribe.
+- **El historial vive en el cliente** y viaja completo en cada petición: el backend no guarda estado de conversación. Por eso el provider se registra en `main.dart` (no en la ruta), para que la conversación sobreviva a salir y volver a `/chatbot`.
+- El turno del usuario se pinta antes de la respuesta, y **se conserva si la petición falla** — borrarlo haría parecer que nunca escribió. `reintentar()` lo reenvía sin duplicarlo.
+- `ChatbotNoDisponibleException` distingue el `503` (servidor sin `OPENAI_API_KEY`) del resto de errores: no es transitorio, así que la UI muestra "Fuera de línea" y **no** ofrece reintentar. El badge tiene tres estados, no dos: hasta el primer mensaje no hay forma de saber si el asistente está configurado, y afirmar "En línea" antes de eso sería inventar.
+- Los botones de `acciones` llegan de una lista cerrada que el backend valida, así que cada uno tiene un destino conocido: dos navegan (`/mapa`, `/aprende`) y el resto se reenvían como una pregunta más.
+
+Ver `05-Discrepancias.md`.
 
 ---
 

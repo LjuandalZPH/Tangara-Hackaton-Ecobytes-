@@ -11,7 +11,7 @@
 - Una landing de presentación del producto.
 - Un mapa de Cali coloreado por sector según calidad del aire actual, con detalle por sector (indicadores actuales, perfil histórico, sensores).
 - Una sección educativa breve sobre PM2.5 y CO2.
-- Un chatbot ambiental (alcance confirmado por el diseño del equipo; implementación real en pausa hasta que se retome — ver `04-Arquitectura-Frontend.md` §8).
+- Un chatbot ambiental (**implementado el 2026-07-25** — `POST /chatbot`, OpenAI alimentado con los datos reales de los sensores, con la pantalla Flutter ya conectada; ver `04-Arquitectura-Frontend.md` §8).
 - **Planificado, sin código todavía:** un kiosko físico (ESP32 + pantalla táctil) que replica en versión reducida el flujo landing→detalle de sector, como segundo cliente del mismo backend. Ver `08-Arquitectura-ESP32.md`.
 
 El alcance está pensado para demostrar el valor central del producto con el menor tiempo de desarrollo posible: acceso abierto sin cuentas de usuario, geometría de sectores resuelta con un archivo estático, datos que se refrescan por sondeo periódico, y una sola interfaz responsive que funciona igual en desktop y en teléfono, sin necesidad de instalar nada.
@@ -38,7 +38,7 @@ El alcance está pensado para demostrar el valor central del producto con el men
   ├── Módulo Mapa        → flutter_map + GeoJSON, refresco por polling
   │     └── Detalle de sector → pestañas Resumen / Historia (perfil histórico) / Sensores
   ├── Módulo Educativo   → contenido estático
-  └── Chatbot            → alcance de producto confirmado por Figma; implementación en pausa
+  └── Chatbot            → conectado de punta a punta (POST /chatbot, OpenAI)
 
 [ ESP32 KIOSKO — planificado, sin código todavía (ver 08-Arquitectura-ESP32.md) ]
   Mismo backend, mismos 5 endpoints, como segundo cliente HTTP

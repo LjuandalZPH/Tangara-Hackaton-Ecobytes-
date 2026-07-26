@@ -14,6 +14,13 @@ clickhouse-connect[async]==1.5.0
 # en la propia query de ClickHouse (ver 03-Arquitectura-Backend.md §4).
 shapely==2.1.2
 
+# LLM — chatbot ambiental (POST /chatbot, services/llm_client.py).
+# Cliente async oficial de OpenAI. Es una dependencia opcional en la
+# práctica: sin OPENAI_API_KEY el endpoint responde 503 y el resto de
+# la API funciona igual, pero el paquete debe estar instalado porque
+# main.py importa el router en el arranque.
+openai==2.48.0
+
 # Cache TTL en memoria (services/cache.py)
 cachetools==7.1.5
 
