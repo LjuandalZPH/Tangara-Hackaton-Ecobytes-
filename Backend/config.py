@@ -50,6 +50,12 @@ settings = Settings()
 #   - "amarillo"(moderado):15 <= PM2.5 <= 35
 #   - "rojo"    (dañino):  PM2.5 > 35
 # ─────────────────────────────────────────────────────────────
+#
+# OJO: estas dos cifras también están escritas en `data/educacion.json`
+# (`umbrales_pm25_ug_m3` y los textos de `niveles_calidad`), que es lo que
+# lee la pantalla "Aprende" del frontend. Si cambias una, cambia la otra:
+# el contenido educativo no puede enseñar una escala distinta de la que el
+# mapa usa para colorear. Ver `Backend/data/README.md`.
 PM25_UMBRAL_BUENO = 15.0
 PM25_UMBRAL_MODERADO = 35.0
 

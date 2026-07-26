@@ -29,9 +29,20 @@ _EDUCACION_PATH = Path(__file__).resolve().parent.parent / "data" / "educacion.j
 _CLAVE_CACHE = "contexto"
 
 
+# Claves de educacion.json que solo sirven para pintar /aprende y que no se le
+# mandan al modelo. Mismo criterio con el que se descarta `geometry`: lo que no
+# ayuda a responder, no se paga en tokens.
+#   - `ui`: copys de sección ("APRENDE", "CUÍDATE", títulos), cero valor.
+#   - `niveles_calidad`: redundante, el contexto ya construye
+#     `umbrales_oms_pm25_ug_m3` desde config.py, incluida la advertencia sobre
+#     gris. Duplicar la escala en prosa solo invita al modelo a citar la otra.
+_CLAVES_EDUCACION_SOLO_UI = ("ui", "niveles_calidad", "umbrales_pm25_ug_m3", "version")
+
+
 def _cargar_educacion() -> dict:
     with open(_EDUCACION_PATH, encoding="utf-8") as f:
-        return json.load(f)
+        contenido = json.load(f)
+    return {k: v for k, v in contenido.items() if k not in _CLAVES_EDUCACION_SOLO_UI}
 
 
 def _resumir_sectores(sectores: list[dict]) -> dict:

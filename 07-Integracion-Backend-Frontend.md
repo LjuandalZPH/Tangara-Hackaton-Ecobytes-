@@ -92,7 +92,7 @@ existen. Estado de consumo desde el frontend:
 | `GET /sectors/{id}` | `SectorDetailProvider` (bajo demanda) | ✅ Conectado (2026-07-23), pestaña "Resumen" de `sector_detail_page.dart` |
 | `GET /sectors/{id}/sensores` | `SectorDetailProvider` (bajo demanda) | ✅ Conectado (2026-07-24), pestaña "Sensores" de `sector_detail_page.dart` |
 | `GET /risk/{sector}` | `RiskProvider` (bajo demanda) | ✅ Conectado (2026-07-23), pestaña "Historia" de `sector_detail_page.dart` |
-| `GET /education` | — | ❌ Sin conectar (la página Aprende usa contenido estático propio) |
+| `GET /education` | `EducationProvider` (carga única, sin polling) | ✅ Conectado (2026-07-25). Con respaldo offline desde `assets/educacion.json` |
 
 ### Detalle de `GET /sectors`
 
@@ -291,8 +291,10 @@ Electrónica lo valide contra un equipo de referencia (tarea `T-01.1`).
 - ✅ **`GET /sectors/{id}/sensores` agregado y conectado (2026-07-24).** Tercera
   pestaña "Sensores" de `sector_detail_page.dart` — ver detalle completo en
   `05-Discrepancias.md` §2.1 y el contrato en `03-Arquitectura-Backend.md` §3.
-- **`GET /education` sin conectar.** La página Aprende sirve contenido estático
-  propio en vez del `data/educacion.json` del backend.
+- ✅ **`GET /education` conectado (2026-07-25).** La página Aprende dejó de tener
+  contenido propio: todo sale de `data/educacion.json`, el mismo archivo que
+  alimenta al chatbot. Eso cerró una divergencia real — la pantalla decía
+  "<800 ppm" de CO2 y el chatbot decía 1000.
 - ✅ **`widget_test.dart` corregido (2026-07-23).** El overflow de layout en
   `landing_footer.dart` (ahora en `shared/widgets/`) era real: la condición de
   apilado usaba el breakpoint de *mobile* (`context.isMobile`, <600) en vez del

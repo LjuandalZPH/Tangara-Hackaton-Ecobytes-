@@ -29,7 +29,7 @@
 | Gestión de estado | `Provider` / `ChangeNotifier` simple | `flutter_bloc` + `equatable` (patrón Bloc completo: `sensor_bloc.dart`, `sensor_event.dart`, `sensor_state.dart`) |
 | Pantallas / rutas | `/`, `/mapa`, `/aprende`, `/chatbot`, más `/mapa/:sectorId` (detalle de sector, alcanzado desde el mapa, no es un ítem de nav) (ver `04-Arquitectura-Frontend.md` §8) | ✅ **Cerrado (2026-07-23).** `AppRoutes` tiene las cuatro rutas de nav más `sectorDetail = '/mapa/:sectorId'`. `sector_detail_page.dart` existe con sus pestañas Resumen/Historia, conectado desde "Ver detalle del sector" en `map_page.dart`. Detalle técnico en `06-Plan-de-Accion.md` §3 paso 9 |
 | Datos del mapa | Vienen de `GET /sectors` (polígonos GeoJSON + estado ya calculado) | ✅ **Cerrado (2026-07-23, landing incluida desde 2026-07-24).** `SectorsProvider` consume `GET /sectors` cada 45 s y `MapArea` pinta los 22 polígonos reales. Los sensores ficticios ("Parque del Amor", "Zona Industrial", "La Flora") y `MockSensorRepository` completo fueron eliminados del repo — ver detalle en §2.1 |
-| Módulo Educativo (`learn/`) | Contenido de `GET /education` o asset local | Existe (`features/learn/`), pero no se ha confirmado si su contenido viene de un asset local o si se conectará a un endpoint — pendiente de decisión (tarea `T-05.2`) |
+| Módulo Educativo (`learn/`) | Contenido de `GET /education` o asset local | ✅ **Cerrado (2026-07-25).** Se decidió conectar al endpoint (`T-05.2`). `learn_page.dart` consume `EducationProvider`; el asset local se conserva solo como respaldo offline y es una copia literal del JSON del backend |
 | Estructura de carpetas por feature | `models/`, `providers/`, página, `widgets/` | Usa `data/`, `domain/`, `presentation/{bloc,pages,widgets}` — nomenclatura tipo Clean Architecture, no la propuesta en el doc |
 | Arranque de la app | Un único widget raíz | ✅ **Cerrado (2026-07-23).** `EcoBytesApp` y `lib/app.dart` se eliminaron; `lib/main.dart` (`MyApp`) es el único widget raíz, ahora aplicando `AppTheme.light` (antes no se aplicaba ningún tema en producción). `AppRoutes` + `appRouter` (`GoRouter`) viven juntos en `core/router/app_router.dart` |
 
@@ -62,7 +62,7 @@ Estos hallazgos no son "doc dice X, código tiene Y" directo, pero salieron al c
 
 ✅ El backend ya implementa el contrato completo de `03-Arquitectura-Backend.md` §3 (`/sectors`, `/sectors/{id}`, `/risk/{sector}`, `/education`), con agregación por sector (mapeo sensor→sector, cálculo de `estado` verde/amarillo/rojo/gris, umbral de "sin datos recientes"), verificado end-to-end contra ClickHouse real — ver `06-Plan-de-Accion.md` §2.4.
 
-Del lado del **frontend**: `dashboard` (`GET /sectors`) ya está conectado (ver sección 2 arriba). Lo que falta conectar es `GET /sectors/{id}` y `GET /risk/{sector}` (sin UI todavía — pendiente EPI-04) y `GET /education` (la página Aprende usa contenido estático propio). `MockSensorRepository` solo sigue vivo en `features/landing/`, que es contenido de marketing, no dashboard (ver §2.1).
+Del lado del **frontend**: `dashboard` (`GET /sectors`) ya está conectado (ver sección 2 arriba). Lo que falta conectar es `GET /sectors/{id}` y `GET /risk/{sector}` (sin UI todavía — pendiente EPI-04). ✅ `GET /education` quedó conectado el 2026-07-25 (`EducationProvider`). `MockSensorRepository` solo sigue vivo en `features/landing/`, que es contenido de marketing, no dashboard (ver §2.1).
 
 ---
 
