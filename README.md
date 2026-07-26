@@ -1,10 +1,13 @@
-# EcoBytes
-
-Plataforma de monitoreo de calidad del aire para Cali, Colombia. Convierte los datos que la red de sensores ciudadanos Tángara recolecta minuto a minuto en un mapa legible, un perfil histórico por comuna y un asistente que responde preguntas sobre el aire en lenguaje corriente.
+<div align="center">
+  <h1>EcoBytes</h1>
+  <strong>Monitoreando el aire de Cali, un byte a la vez.</strong>
+</div>
+<img src="https://media.giphy.com/media/mGcNjsfWAjY5AEZNw6/giphy.gif" width="50"></h2>
+ Plataforma de monitoreo de calidad del aire para Cali, Colombia. Convierte los datos que la red de sensores ciudadanos Tángara recolecta minuto a minuto en un mapa legible, un perfil histórico por comuna y un asistente que responde preguntas sobre el aire en lenguaje corriente.
 
 Desarrollado por el equipo **Bit&Volt Labs** para la Tángara Hackathon 2026.
 
-## El problema
+## 🌲 El Problema
 
 Cali cuenta con una red de más de veinte sensores ciudadanos de calidad del aire operando desde 2021, con mediciones reales de material particulado fino (PM2.5), CO2 y humedad. Esos datos existen y son técnicamente sólidos, pero viven en una infraestructura pensada para análisis de datos, no para consulta directa: sin agregación por zona de la ciudad, sin clasificación en términos que un no especialista pueda interpretar de un vistazo, y sin un canal para hacer una pregunta en español y recibir una respuesta concreta.
 
@@ -13,16 +16,19 @@ EcoBytes no instala sensores nuevos ni construye un pipeline de datos propio. To
 - **Un mapa** de las 22 comunas de Cali, coloreado en verde, amarillo, rojo o gris según qué tan segura de respirar es el aire ahora mismo.
 - **Un perfil histórico** por comuna: cómo ha estado el aire en el último año, qué tan seguido se superó el límite recomendado por la Organización Mundial de la Salud, y en qué meses fue mejor o peor.
 - **Un asistente conversacional** que responde en lenguaje natural — "¿cómo está el aire en la comuna 17 hoy?" — usando siempre las cifras reales del momento, nunca una estimación inventada.
+- **Un kiosko físico con pantalla táctil (ESP32)** que replica el flujo esencial en un punto de consulta público, sin depender de un navegador. El objetivo es que estos dispositivos puedan instalarse en colegios y hogares para ofrecer información accesible sobre la calidad del aire.
 
-El mismo contenido está disponible también desde un kiosko físico con pantalla táctil, para quienes no tienen o no quieren usar un navegador — pensado como punto de consulta en un espacio público.
 
-## Por qué importa
+---
+
+## ❤️ Por Qué Importa
 
 El material particulado fino (PM2.5) es el contaminante del aire con mayor evidencia de daño a la salud humana: penetra hasta el torrente sanguíneo, agrava enfermedades respiratorias y cardiovasculares, y su exposición prolongada se asocia con menor esperanza de vida. La Organización Mundial de la Salud fija umbrales de referencia — y EcoBytes clasifica cada comuna exactamente contra esos umbrales, sin inventar una escala propia.
 
-Que un dato exista en una base de datos no significa que esté al alcance de quien lo necesita. Un padre decidiendo si su hijo puede jugar afuera, un ciclista planeando su ruta, un docente explicando el tema en clase, o un funcionario público preparando un reporte, no necesitan una consulta SQL: necesitan una respuesta directa, honesta sobre lo que no se sabe (una comuna sin sensores cercanos se muestra explícitamente como "sin datos", nunca como "aire limpio"), y en su idioma. Esa es la brecha que este proyecto cierra: no la de recolectar datos, sino la de hacerlos legibles y accionables.
+> Que un dato exista en una base de datos no significa que esté al alcance de quien lo necesita. Un padre decidiendo si su hijo puede jugar afuera, un ciclista planeando su ruta, un docente explicando el tema en clase, o un funcionario público preparando un reporte, no necesitan una consulta SQL: necesitan una respuesta directa, honesta sobre lo que no se sabe (una comuna sin sensores cercanos se muestra explícitamente como "sin datos", nunca como "aire limpio"), y en su idioma. Esa es la brecha que este proyecto cierra: no la de recolectar datos, sino la de hacerlos legibles y accionables.
 
-## Para quién es
+
+## 👥 Para Quién Es
 
 - Personas que quieren saber si el aire de su comuna es seguro hoy.
 - Padres, cuidadores y personas con condiciones respiratorias que necesitan un perfil de riesgo por zona.
@@ -30,7 +36,8 @@ Que un dato exista en una base de datos no significa que esté al alcance de qui
 - Periodistas e investigadores que necesitan datos locales verificables, con su fuente y su metodología a la vista.
 - Funcionarios públicos y organizaciones de la sociedad civil que necesitan comunicar el estado del aire sin depender de un intermediario técnico.
 
-## Cómo está compuesto
+
+## 🏗️ Cómo Está Compuesto
 
 | Componente | Qué es | Documentación |
 | --- | --- | --- |
@@ -40,11 +47,13 @@ Que un dato exista en una base de datos no significa que esté al alcance de qui
 | Arquitectura general | Visión de conjunto, diagramas y decisiones de diseño | [`docs/arquitectura.md`](./docs/arquitectura.md) |
 | Backlog | Estado real de cada funcionalidad, reconstruido desde el código | [`docs/backlog.md`](./docs/backlog.md) |
 
-## Arquitectura de despliegue, en resumen
+
+## 🚀 Arquitectura de Despliegue
 
 El backend es autoalojado y se publica a internet mediante **Tailscale Funnel** (una URL HTTPS pública sin necesidad de abrir puertos ni gestionar certificados manualmente). El frontend se despliega como sitio estático en **Vercel**, compilado apuntando a esa misma URL. El kiosko ESP32 es un tercer cliente HTTP independiente, que consume el backend por la misma vía. Ningún componente mantiene una base de datos propia de sensores: toda la telemetría se lee, en tiempo real y en modo exclusivamente lectura, de la capa Plata del pipeline de Tángara en ClickHouse. Detalle completo en [`docs/arquitectura.md`](./docs/arquitectura.md).
 
-## Cómo instalarlo y correrlo
+
+## ⚙️ Cómo Instalarlo y Correrlo
 
 ### Requisitos
 
@@ -94,6 +103,26 @@ cp Firmware/esp32-kiosko/secrets.h.example Firmware/esp32-kiosko/secrets.h
 
 Pasos completos de compilación y flasheo en [`docs/firmware-esp32-kiosko.md`](./docs/firmware-esp32-kiosko.md).
 
-## Equipo
+
+## 🧑‍💻 Equipo
 
 **Bit&Volt Labs** — equipo de cinco estudiantes de ingeniería de la Universidad del Valle (Cali, Colombia), con perfiles en Ingeniería de Sistemas e Ingeniería Electrónica. Proyecto presentado en la Tángara Hackathon 2026, "Habla y Crea con los Datos de Calidad del Aire de Cali".
+
+
+
+<div align="center">
+  
+  <table>
+    <tr>
+      <td align="center"><a href="https://github.com/Inmemorialake"><img src="https://avatars.githubusercontent.com/u/103388918?v=4" width="100px;" alt="Inmemorialake"/><br /><sub><b>Inmemorialake</b></sub></a></td>
+      <td align="center"><a href="https://github.com/LjuandalZPH"><img src="https://avatars.githubusercontent.com/u/98624566?v=4" width="100px;" alt="LjuandalZPH"/><br /><sub><b>LjuandalZPH</b></sub></a></td>
+      <td align="center"><a href="https://github.com/AGONIXX15"><img src="https://avatars.githubusercontent.com/u/111300994?v=4" width="100px;" alt="AGONIXX15"/><br /><sub><b>AGONIXX15</b></sub></a></td>
+      <td align="center"><a href="https://github.com/AlejandraCarvajal95"><img src="https://avatars.githubusercontent.com/u/115739824?v=4" width="100px;" alt="AlejandraCarvajal95"/><br /><sub><b>AlejandraCarvajal95</b></sub></a></td>
+      <td align="center"><a href="https://github.com/Valmorales18"><img src="https://avatars.githubusercontent.com/u/115740005?v=4" width="100px;" alt="Valmorales18"/><br /><sub><b>Valmorales18</b></sub></a></td>
+    </tr>
+  </table>
+</div>
+
+<p align="center">
+  Hecho en Cali, Colombia con amor 💚
+</p>

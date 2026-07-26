@@ -93,6 +93,7 @@ class _MapAreaSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sectorsProvider = context.watch<SectorsProvider>();
+    final isMobile = context.isMobile;
 
     return Column(
       children: [
@@ -109,6 +110,13 @@ class _MapAreaSection extends StatelessWidget {
             child: _buildContenidoMapa(context, sectorsProvider),
           ),
         ),
+        if (isMobile) ...[
+          const SizedBox(height: AppSpacing.md),
+          MapLegend(
+            coberturaSectores: sectorsProvider.sectores.where((s) => s.tieneDatos).length,
+            totalSectores: sectorsProvider.sectores.length,
+          ),
+        ],
         const SizedBox(height: AppSpacing.md),
         // Barra de estadísticas inferior
         _BottomMetricsBar(sectores: sectorsProvider.sectores),
@@ -156,6 +164,7 @@ class _MapAreaSection extends StatelessWidget {
           sectores: provider.sectores,
           sectorSeleccionadoId: provider.sectorSeleccionado?.id,
           onSectorTap: provider.seleccionarSector,
+          showLegend: !context.isMobile,
         );
     }
   }
