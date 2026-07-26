@@ -20,6 +20,12 @@ build/
 # sectores.geojson y educacion.json sí deben versionarse (ver 03-Arquitectura-Backend.md §8)
 *.csv
 *.csv.gz
+# Excepción: partitions.csv del firmware ESP32 no es un dato, es config de
+# build (esquema de particiones de flash) que tiene que versionarse -- ver
+# 06-Plan-de-Accion.md §5.2. Sin esto, *.csv de arriba lo excluye sin
+# querer y cualquiera que clone el repo pisa el mismo overflow de flash
+# que costó resolver en T-07.2.
+!Firmware/esp32-kiosko/partitions.csv
 
 # Grafo de conocimiento generado por graphify (~2 MB, regenerable con /graphify)
 graphify-out/

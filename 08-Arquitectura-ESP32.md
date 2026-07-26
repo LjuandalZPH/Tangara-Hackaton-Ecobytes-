@@ -1,11 +1,15 @@
 # 📟 Arquitectura ESP32 — kiosko táctil de calidad del aire
 
-**Última actualización:** 2026-07-24
+**Última actualización:** 2026-07-25
 **Rama:** `develop`
-**Estado:** documento de diseño. **No hay firmware escrito todavía** — esto define
-qué se va a construir, no describe código existente (a diferencia de
-[`07-Integracion-Backend-Frontend.md`](./07-Integracion-Backend-Frontend.md), que
-documenta estado real).
+**Estado:** documento de diseño para lo que sigue sin construir (T-07.3 en
+adelante). El scaffold inicial y el smoke test (T-07.1/T-07.2) **ya tienen
+código real** en `Firmware/esp32-kiosko/`, confirmado funcionando en
+hardware el 2026-07-25 — ver `Firmware/esp32-kiosko/README.md` y
+`06-Plan-de-Accion.md` §5 para el estado real y actualizado (a diferencia
+de este documento, que sigue describiendo el diseño objetivo, no siempre
+el código tal cual quedó, ej. la placa real resultó ser panel ST7789 en vez
+de ILI9341).
 
 > Este componente es nuevo y no está cubierto por `01-Arquitectura.md` ni por
 > `04-Arquitectura-Frontend.md` (esos hablan de la app Flutter web). Vive fuera
@@ -163,14 +167,26 @@ Nueva carpeta a nivel de raíz, hermana de `Backend/` y `Frontend/`:
 
 ```
 Firmware/esp32-kiosko/
-├── platformio.ini
-├── src/
-│   ├── main.cpp
-│   ├── ui/            # pantallas LVGL: config, landing, details
-│   ├── net/            # cliente HTTP + parseo JSON
-│   └── storage/         # wrapper de Preferences (NVS)
-└── lib/                # config de LovyanGFX para ESP32-2432S028
+├── esp32-kiosko.ino      # sketch principal (setup/loop), mismo nombre que la carpeta
+├── ui_config.cpp/.h       # pantalla de configuración táctil
+├── ui_landing.cpp/.h      # pantalla Landing
+├── ui_details.cpp/.h      # pantalla Details
+├── net_client.cpp/.h      # cliente HTTP + parseo JSON (LectorResiliente, filtro ArduinoJson)
+├── storage_prefs.cpp/.h   # wrapper de Preferences (NVS)
+├── lv_conf.h               # config de LVGL, versionada -- ver §7
+└── secrets.h               # WiFi + URL backend, no versionado (.gitignore)
 ```
+
+**Todos los `.cpp`/`.h` van sueltos junto al `.ino`, sin subcarpetas** —
+Arduino IDE (arduino-cli por debajo) solo compila automáticamente los
+archivos que están directo en la carpeta del sketch; no busca recursivamente
+en subcarpetas como `ui/` o `net/`. La separación por dominio se hace con el
+prefijo del nombre de archivo (`ui_*`, `net_*`, `storage_*`), no con carpetas.
+**`lv_conf.h` sí vive en este repo** (a diferencia de lo que se asumió al
+principio de T-07.2, ver §7): el build de Arduino agrega `-I<carpeta del
+sketch>` al compilador para todo sketch, siempre — confirmado con el log
+verbose de compilación real (2026-07-25) — así que un `lv_conf.h` puesto acá
+mismo se encuentra sin depender de ninguna carpeta global de la máquina.
 
 No se toca `Backend/` ni `Frontend/ecobytes/` — el firmware es un cliente más
 del mismo contrato, igual que ya lo es el frontend Flutter.
@@ -181,12 +197,31 @@ del mismo contrato, igual que ya lo es el frontend Flutter.
 
 | Pieza | Elección | Motivo |
 | --- | --- | --- |
-| Toolchain | PlatformIO | Mejor manejo de dependencias que Arduino IDE para este combo de librerías |
+| Toolchain | **Arduino IDE** (decisión revertida 2026-07-25, ver nota abajo) | Ya usado y probado en el spike T-07.1; un solo dev toca el firmware hoy |
 | UI | LVGL v8 | Estándar de facto para touch embebido; `lv_chart`, `lv_tabview`, `lv_keyboard` cubren todo lo de §4 sin widgets custom |
 | Driver display+touch | LovyanGFX | Config ya publicada por la comunidad para "ESP32-2432S028"; mejor soportado que TFT_eSPI para este board específico |
 | HTTP | `HTTPClient` (core WiFi de Arduino) | No hace falta TLS si el backend corre en HTTP plano dentro de la LAN del hackathon |
 | Parseo JSON | `ArduinoJson` v7, **con filtro** | Ver advertencia crítica en §8 |
 | Persistencia config | `Preferences.h` (NVS) | Estándar de Arduino-ESP32 para este caso, no hace falta filesystem propio |
+
+> **Nota (2026-07-25):** el toolchain original era PlatformIO, elegido por mejor
+> manejo de dependencias que Arduino IDE — puntualmente por `lv_conf.h` de
+> LVGL, que según la documentación de LVGL se resuelve "junto a la carpeta de
+> la librería", lo que se asumió (mal, ver corrección abajo) que obligaba a
+> vivir en una carpeta global compartida por todos los sketches de la
+> máquina, no versionable dentro de este repo. Revertido a Arduino IDE porque
+> hoy un solo dev toca este firmware y ya está probado con el spike T-07.1.
+>
+> **Corrección (2026-07-25, verificada con el log verbose de una compilación
+> real):** esa preocupación no aplica. El build de Arduino agrega
+> `-I<carpeta del sketch>` al compilador en todo sketch, siempre — no hace
+> falta ninguna carpeta global. `lv_conf.h` vive en `Firmware/esp32-kiosko/`
+> (ver §6), versionado como cualquier otro archivo del proyecto. El primer
+> intento sí lo puso en la carpeta global (`<sketchbook>/libraries/`) por
+> asumir la regla de include sin confirmarla contra un build real, y falló
+> con `fatal error: lv_conf.h: No such file or directory` hasta corregir la
+> ubicación. El riesgo de colisión entre proyectos que motivó elegir
+> PlatformIO originalmente ya no aplica con este layout — ver también §6.
 
 ---
 
@@ -266,7 +301,7 @@ práctica y no solo en teoría.
 ## 11. Pendiente (no empezado)
 
 - [ ] Spike de memoria de §9 (bloqueante para todo lo demás).
-- [ ] Estructura de proyecto PlatformIO (`Firmware/esp32-kiosko/`).
+- [ ] Estructura de archivos del sketch Arduino IDE (`Firmware/esp32-kiosko/`, ver §6) + instalar LVGL v8 y LovyanGFX vía Library Manager.
 - [ ] Pantalla de configuración táctil (WiFi + URL backend + calibración touch).
 - [ ] Sincronización NTP tras conectar WiFi, con fallback a timestamp crudo (ver §10).
 - [ ] Pantalla Landing (lista de sectores + agregados de ciudad).

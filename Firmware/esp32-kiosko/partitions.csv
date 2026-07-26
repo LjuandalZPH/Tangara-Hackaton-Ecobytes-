@@ -1,0 +1,20 @@
+# Name,   Type, SubType, Offset,  Size, Flags
+#
+# Partition table custom para el kiosko ESP32 EcoBytes (ver
+# 06-Plan-de-Accion.md §5.2). Arduino IDE usa este archivo en vez del
+# esquema por defecto del board porque vive directo en la carpeta del
+# sketch (mismo mecanismo que lv_conf.h, ver 08-Arquitectura-ESP32.md §6).
+#
+# Por que no el esquema "Default" (dos particiones app de 1.25MB c/u +
+# spiffs): ese reparto es para soportar actualizacion OTA con rollback,
+# que este proyecto no usa (se flashea por USB, un solo dev). Con una
+# sola particion de app grande (basado en el preset oficial "huge_app.csv"
+# del core esp32) el binario de LVGL+LovyanGFX+WiFi+HTTPClient+ArduinoJson
+# entra con margen. Tampoco usamos SPIFFS/LittleFS -- la config de red y
+# la calibracion de touch van por NVS via Preferences.h (storage_prefs.h),
+# no por filesystem -- la particion spiffs queda sin usar pero no estorba.
+nvs,      data, nvs,     0x9000,  0x5000,
+otadata,  data, ota,     0xe000,  0x2000,
+app0,     app,  ota_0,   0x10000, 0x300000,
+spiffs,   data, spiffs,  0x310000,0xE0000,
+coredump, data, coredump,0x3F0000,0x10000,

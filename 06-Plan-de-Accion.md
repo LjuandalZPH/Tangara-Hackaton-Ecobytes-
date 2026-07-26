@@ -190,6 +190,470 @@ real parseando `GET /sectors` con el filtro de ArduinoJson (descarta el campo
 `geometry`, que el ESP32 no necesita y pesa demasiado sin filtrar) — sin eso
 validado, el resto de las pantallas no tiene sentido construirlas.
 
+### 5.1 ✅ T-07.1 (spike de heap) corrido en hardware real — memoria viable, latencia como riesgo abierto
+
+Corrido en un ESP32-2432S028 real contra el backend expuesto por Tailscale
+Funnel (ver `Firmware/esp32-kiosko/README.md`), 2026-07-25.
+
+**Hallazgo 1 — el timeout inicial de `LectorResiliente` (5000 ms) no
+alcanzaba:** en la primera corrida, 3 de 5 fetches fallaron con
+`Fallo al parsear JSON: IncompleteInput` porque el relay de Tailscale Funnel
+dejó huecos de silencio de más de 5 s a mitad de transferencia de los ~774 KB
+de `/sectors` (la conexión seguía viva, solo dejaba de haber bytes
+disponibles momentáneamente). Corregido subiendo `kStallMaxMs` a 12000 ms en
+`Firmware/esp32-kiosko/esp32-kiosko.ino` (clase `LectorResiliente`). Con ese
+cambio, corrida siguiente: **5/5 fetches completaron sin ningún fallo de
+parseo.**
+
+**Hallazgo 2 — memoria y fragmentación: viable, sin ajustes adicionales.**
+En la corrida limpia de 5/5, `bloque_max_contiguo` (`ESP.getMaxAllocHeap()`)
+se mantuvo clavado en el mismo valor en los 5 fetches — cero fragmentación
+detectada. `min_historico` cae en el primer fetch (esperable, WiFi/TLS
+calentando) y luego se estabiliza en los fetches siguientes, exactamente el
+patrón que `Firmware/esp32-kiosko/README.md` define como criterio de éxito.
+**El diseño de filtrar `geometry` con `DeserializationOption::Filter` y
+parsear en streaming alcanza para los 520 KB de SRAM del ESP32-2432S028.**
+
+**Hallazgo 3 (riesgo abierto, no resuelto) — el fetch completo tarda
+~45-50 s.** El filtro de ArduinoJson ahorra RAM pero no tráfico: el ESP32
+igual tiene que **recibir** los ~774 KB completos (con `geometry` incluido)
+antes de descartar ese campo al parsear — ver comentario en
+`esp32-kiosko.ino` junto a `WiFiClient& stream = http.getStream();`. Con el
+throughput real observado del relay de Funnel (~15 KB/s), cada poll de
+`/sectors` tarda casi un minuto. Subir el timeout evitó el corte del JSON
+pero no ataca la causa. **Antes de construir la pantalla Landing (T-07.4),
+decidir si esto es aceptable** o si hace falta que el backend ofrezca una
+variante de `/sectors` que excluya `geometry` en el servidor (reduciría el
+tráfico real, no solo la RAM del cliente) — eso implicaría un 6º endpoint o
+un query param, a evaluar contra el principio de "solo 5 endpoints" de
+`03-Arquitectura-Backend.md` §3.
+
+### 5.2 🟡 T-07.2 (smoke test) — primer intento de compilación falló por overflow de DRAM estática, corregido
+
+Al compilar el smoke test (FQBN `esp32:esp32:esp32`, ESP32 Dev Module) con
+LVGL v8 + LovyanGFX ya enlazadas, el link falló:
+
+```
+section `.dram0.bss' will not fit in region `dram0_0_seg'
+region `dram0_0_seg' overflowed by 27152 bytes
+```
+
+**Causa:** dos reservas de memoria *estática* (`.bss`, no heap) que se
+suman en tiempo de compilación, no de ejecución:
+
+- `bufA`/`bufB` en `esp32-kiosko.ino` (buffers de dibujo de LVGL, arrays
+  globales) — a 40 líneas de alto cada uno, ~50 KB entre los dos.
+- El pool interno de LVGL (`lv_conf.h`, `LV_MEM_SIZE`) — con
+  `LV_MEM_CUSTOM 0`, también es un array estático, no memoria pedida a
+  `malloc()` en runtime. Estaba en 48 KB.
+
+El presupuesto de `08-Arquitectura-ESP32.md` §9 contaba el buffer de LVGL
+como si fuera heap ("~50 KB de buffer de LVGL... recomendado por LVGL para
+boards sin PSRAM") sin distinguir que tanto ese buffer como el pool interno
+de LVGL son estáticos — la distinción importa porque lo estático se valida
+en el *link*, antes de que el firmware corra, mientras que el heap se
+valida en runtime (`ESP.getFreeHeap()`, que es lo que sí midió T-07.1).
+
+**Corregido** bajando ambos valores (con margen, no al mínimo):
+`LV_MEM_SIZE` de 48 KB a 24 KB (`lv_conf.h`) y `kBufAlturaLineas` de 40 a
+20 (`esp32-kiosko.ino`) — libera ~50 KB de `.bss`, contra un overflow de
+27 KB. Suficiente para las pantallas placeholder actuales; si una pantalla
+futura con más objetos/estilos simultáneos (ej. la Landing con lista de 22
+filas, T-07.4) vuelve a desbordar, subir `LV_MEM_SIZE` de a poco y medir
+con `LV_USE_MEM_MONITOR`, no volver a 48 KB de entrada.
+
+**Segundo intento:** el overflow de DRAM se resolvió (variables globales
+101 548 bytes / 30% de 327 680, dentro del máximo), pero apareció un error
+distinto — de **flash**, no de RAM:
+
+```
+Sketch uses 1316919 bytes (100%) of program storage space. Maximum is 1310720 bytes.
+```
+
+`1310720` (`0x140000`) es el tamaño de `app0` en el esquema de particiones
+por defecto del core ESP32 para un board de 4 MB, que reserva **dos**
+particiones de app de 1.25 MB (para OTA con rollback) + spiffs — este
+proyecto no usa OTA (flasheo por USB) ni spiffs/LittleFS (NVS vía
+`Preferences.h` para config de red y calibración de touch, ver
+`storage_prefs.h`), así que ese reparto le deja muy poco a `app0` para un
+binario que ya de por sí es grande (LVGL con `lv_conf.h` trae habilitado
+por defecto GIF/PNG/QR/FreeType/rlottie/fuentes CJK que este kiosko no
+usa). **Corregido** agregando `Firmware/esp32-kiosko/partitions.csv`
+(basado en el preset oficial `huge_app.csv` del core 3.3.10): una sola
+partición de app de 3 MB sin slot OTA duplicado. Arduino IDE usa este
+archivo por estar directo en la carpeta del sketch, sin tocar ningún menú
+— mismo mecanismo que ya aprovecha `lv_conf.h` (`08-Arquitectura-ESP32.md`
+§6).
+
+**Pendiente de confirmar:** recompilar con `partitions.csv` presente y
+verificar que ni el link (DRAM) ni el tamaño de flash desbordan, y correr
+en hardware real (los criterios de éxito de T-07.2 siguen siendo los del
+`README.md` del firmware).
+
+### 5.3 🟡 T-07.2 (smoke test) — reinicios en loop durante el fetch en hardware real, causa probable: brownout
+
+Con la compilación ya resuelta (§5.2), correr el smoke test en el
+ESP32-2432S028 real mostró la pantalla con un patrón de ruido/franjas en
+vez del placeholder limpio de la Landing. El Serial Monitor (115200) lo
+explica: el dispositivo entra en un **ciclo de reinicios**, siempre a
+mitad del flujo WiFi→fetch→cargar Landing, nunca estable en una pantalla:
+
+- El fetch en sí es sólido cuando llega a completar: 3 corridas con
+  `Sectores parseados: 22`, sin fragmentación (`bloque_max_contiguo`
+  estable ~65-75 KB), heap se recupera bien después (~162 KB libres).
+- El reinicio ocurre en un punto **distinto cada vez** (a veces recién al
+  cargar la Landing después del fetch, otras veces a mitad del fetch,
+  justo después de recibir los headers HTTP) — no es un lugar fijo del
+  código, lo que apunta a una condición de carrera/umbral (voltaje), no a
+  un bug determinístico.
+- **Sin ningún mensaje de diagnóstico antes del reinicio** — ni
+  `Guru Meditation Error` con backtrace (que sí aparecería con un crash de
+  software real: stack overflow, memoria inválida) ni siquiera
+  `Brownout detector was triggered` de forma consistente. Un reset
+  completamente silencioso, sin backtrace, es la firma típica de un corte
+  de energía real (que puede tumbar también al puente USB-serie a mitad
+  de imprimir, perdiendo el mensaje) — no de una excepción atrapada por
+  software.
+- **Se descartó el cable USB** como causa (probado con uno distinto,
+  mismo resultado) — el sospechoso que queda es el puerto/fuente (los
+  puertos USB de PC suelen limitar más la corriente que un cargador de
+  pared) o el regulador de voltaje a bordo del ESP32-2432S028, que es
+  conocido en la comunidad maker por ir justo al límite bajo la carga
+  combinada de WiFi + pantalla.
+
+**Mitigación de firmware aplicada** (no ataca la causa de raíz si es el
+regulador de la placa, pero reduce los picos de corriente que la gatillan):
+en `esp32-kiosko.ino`, `WiFi.setTxPower(WIFI_POWER_8_5dBm)` después de
+conectar (baja la potencia de transmisión, y con ella los picos de
+corriente de las ráfagas de radio durante los ~35-40s que dura el fetch) y
+`lcd.setBrightness(0)` durante el fetch (apaga el backlight mientras no
+hay nada que mostrar, restaurado a `255` antes de cargar la Landing).
+
+**Pendiente de confirmar:** recompilar y correr de nuevo en hardware real
+con estas dos mitigaciones; si el reinicio persiste, el siguiente paso es
+probar alimentación desde un cargador de pared en vez del puerto USB de la
+PC, para terminar de aislar puerto/fuente vs. regulador de la placa.
+
+**Cable, puerto y cargador de pared descartados** (mismo resultado con los
+tres) — apunta al regulador/desacople de la placa misma, no a la fuente
+externa. Se verificaron también los pines SPI de `LGFX_Config.h` contra la
+fuente primaria de Random Nerd Tutorials para este board exacto: coinciden
+uno por uno (pantalla en HSPI, touch en VSPI, sin contención de bus) — se
+descarta un pin mal asignado como causa.
+
+Decisión del equipo (2026-07-25): **no se va a soldar un capacitor** en
+esta placa. Como último recorte de corriente por software antes de
+aceptar la limitación de hardware, se bajó `WiFi.setTxPower()` de
+`WIFI_POWER_8_5dBm` a **`WIFI_POWER_2dBm`** (el mínimo que expone el core)
+en `esp32-kiosko.ino`. Si el reinicio persiste incluso con esto, la
+conclusión queda asentada como: **limitación de hardware conocida de esta
+unidad/placa, pendiente de una fuente de mejor calidad o un capacitor
+externo antes del despliegue final del kiosko** — no bloquea seguir
+escribiendo el resto del firmware (T-07.3 en adelante) en paralelo.
+
+### 5.4 ✅ Encontrada la causa real del ruido en pantalla — panel ST7789, no ILI9341
+
+El ruido en pantalla resultó ser un problema **separado y distinto** del
+brownout de §5.3 — persistía incluso con WiFi/fetch completamente
+deshabilitado (bandera `kSaltarWifiYFetch`), o sea que no era de
+alimentación. Aislado con un test de `lcd.fillScreen()` directo con
+LovyanGFX (sin pasar por LVGL): los colores sólidos salían bien en la
+mayor parte de la pantalla, pero **una franja fija en la misma posición
+(~15-20% inferior) nunca se actualizaba**, sea cual sea el color pedido —
+mismo patrón visto antes con el placeholder de LVGL. Como el defecto
+aparecía incluso en un `fillScreen()` sin LVGL de por medio, quedaba claro
+que no era un bug de `lvglFlushCb`/buffer, sino algo más abajo, en la
+configuración del panel mismo (`LGFX_Config.h`).
+
+**Causa encontrada:** el ESP32-2432S028R tiene dos variantes de hardware
+con controladores de panel distintos (ILI9341 o ST7789), indistinguibles
+por firmware/ID de chip fácil — la señal conocida en la comunidad es la
+cantidad de puertos USB físicos: un solo Micro-USB → ILI9341; Micro-USB +
+USB-C → ST7789. Esta unidad tiene **ambos puertos** → es la variante
+ST7789. `LGFX_Config.h` tenía configurado `Panel_ILI9341` desde el
+principio (T-07.2) — nunca se verificó cuál controlador tenía la unidad
+real. Los protocolos ILI9341/ST7789 se parecen lo suficiente como para
+dibujar *algo* (de ahí que colores y hasta texto aparecieran, parcialmente
+reconocibles) pero no lo bastante como para direccionar el panel completo
+de forma consistente — de ahí la franja que nunca se actualizaba.
+
+**Corregido** en `LGFX_Config.h`: `Panel_ILI9341` → `Panel_ST7789`,
+`freq_write` 40MHz → 80MHz, `dummy_read_bits` 1 → 16, `offset_rotation`
+del touch 0 → 2 (los cuatro valores típicos para la variante ST7789 de
+este board, según la comunidad).
+
+**✅ Confirmado en hardware real (2026-07-25):** con el panel corregido y
+`kSaltarWifiYFetch` vuelto a `false`, el flujo completo (WiFi → fetch de
+`/sectors` (~35-40s) → Landing) corrió de punta a punta **sin reinicios**.
+Rotación y touch salieron bien con los valores puestos, sin necesidad de
+ajuste adicional. Los reinicios intermitentes que se venían atribuyendo a
+brownout (§5.3) no volvieron a aparecer — quedan como sospecha no
+confirmada del todo (podrían haber sido, en parte, un síntoma más de mandar
+comandos del panel equivocado, no solo alimentación); si reaparecen más
+adelante bajo otras condiciones, retomar la mitigación de `WiFi.setTxPower`
+y la opción del capacitor de §5.3.
+
+Sources: [Embedded Kiddie — ESP32 2432S028R (CYD) LVGL: ILI9341 vs ST7789](https://embedded-kiddie.github.io/2025/03/09/)
+
+### 5.5 🟡 T-07.3 (portal de configuración) — código escrito, pendiente de hardware
+
+Con T-07.2 cerrado, se implementó el portal de configuración táctil real:
+
+- **`ui_config.cpp`**: pasó de placeholder a un wizard de 3 pasos sobre la
+  misma pantalla (mostrando/ocultando contenedores — 320×240 no alcanza
+  para todo el formulario + teclado a la vez): 1) elegir red WiFi
+  (`lv_dropdown` poblado con `WiFi.scanNetworks()`), 2) password
+  (`lv_textarea` en modo password + `lv_keyboard` compartido), 3) URL del
+  backend (otro `lv_textarea`, reutiliza el mismo teclado) + botón
+  "Guardar y conectar", que prueba la conexión real antes de persistir en
+  NVS (`storage_prefs.h`) y reiniciar hacia el flujo normal.
+- **Calibración de touch de 4 puntos**: `lcd.calibrateTouch()` es una
+  rutina de LovyanGFX (dibuja sus propias cruces, no es un widget LVGL),
+  así que corre en `esp32-kiosko.ino` antes de cargar cualquier pantalla,
+  no dentro de `ui_config.cpp`. Se corre una sola vez por dispositivo — el
+  resultado se persiste en NVS y en arranques siguientes se restaura con
+  `lcd.setTouchCalibrate()` sin pedir la calibración de nuevo.
+- **Refactor de `net_client`**: `conectarWifi()` se movió desde el `.ino` a
+  `net_client.cpp` (ahora `net::conectarWifi`) para que el wizard pueda
+  probar la red elegida sin duplicar la lógica. `net::fetchSectores` ahora
+  recibe la URL del backend como parámetro (`config.backendUrl`, la que
+  guardó el wizard) en vez de leer `kBackendBaseUrl` de `secrets.h`.
+- **`secrets.h` cambió de rol, no desapareció.** Ni `net_client.cpp` ni
+  `esp32-kiosko.ino` lo referencian, pero `ui_config.cpp` sí lo usa
+  (agregado después, a pedido explícito, para agilizar las pruebas
+  repetidas) para precargar el campo de URL del backend con
+  `kBackendBaseUrl` cuando no hay nada guardado en NVS todavía — ya no es
+  un fallback que salta el wizard entero, solo ahorra tipeo. Sigue siendo
+  necesario que el archivo exista para compilar (antes no lo era). Con
+  esto, no queda pendiente ninguna decisión de retirarlo.
+
+**Sin confirmar en hardware real todavía.** Dos puntos concretos a
+verificar en la próxima sesión con la placa:
+1. El layout de los 3 pasos (título + widget + botón, con el teclado
+   ocupando los ~120px inferiores de los 240px totales) — no se pudo
+   previsualizar sin simulador; si algo queda tapado por el teclado o no
+   entra, es un ajuste de posiciones/tamaños en `ui_config.cpp`, no un
+   problema de diseño de fondo.
+2. La firma exacta de `lcd.calibrateTouch(parametros, color_fg, color_bg,
+   size)` y `lcd.setTouchCalibrate(parametros)` contra la versión de
+   LovyanGFX instalada — se escribió contra el patrón documentado de la
+   librería, pero no se pudo compilar en este entorno para confirmarlo
+   letra por letra.
+
+### 5.6 ✅ Dos bugs reales encontrados al probar T-07.3 en hardware — corregidos
+
+Primera corrida en hardware real de T-07.3: la interfaz cargó bien, pero
+el touch funcionaba mal (a veces no respondía, a veces registraba en el
+lugar equivocado, a veces hacía falta tocar varias veces), y nunca
+aparecieron las cruces de calibración de 4 puntos en el primer arranque —
+pasó directo al portal de configuración. Además, al reintentar conectar
+WiFi después de un primer intento fallido, el ESP32 crasheó y reinició
+(`E (...) wifi:sta is connecting, cannot set config`, seguido de texto
+corrupto en el Serial y el banner de reinicio de siempre).
+
+**Bug 1 — array de calibración de touch del tamaño equivocado.** El punto
+2 pendiente de la corrida anterior (§5.5) resultó ser el problema real, no
+un detalle menor. Se clonó el repo de LovyanGFX
+(`lovyan03/LovyanGFX`, `src/lgfx/v1/LGFXBase.hpp` y `.cpp`) para verificar
+la firma contra el código fuente en vez de seguir adivinando:
+
+```cpp
+/// This requires a uint16_t array with 8 elements. ( or nullptr )
+void calibrateTouch(uint16_t *parameters, const T& color_fg, const T& color_bg, uint8_t size = 10)
+...
+void calibrate_touch(uint16_t *parameters, ...) {
+  ...
+  if (nullptr != parameters) {
+    memcpy(parameters, orig, sizeof(uint16_t) * 8);
+  }
+}
+```
+
+`storage::CalibracionTouch` (diseñado en T-07.2, antes de poder verificar
+esto) tenía 4 campos con nombre (`xMin`/`xMax`/`yMin`/`yMax`), asumiendo
+una calibración simple de min/max por eje. Es la firma equivocada: al
+pasarle un `uint16_t[4]` a una función que escribe 8 valores vía `memcpy`,
+se desbordaba el stack en 8 bytes, corrompiendo memoria vecina — la causa
+más probable del touch errático (y posiblemente un factor en el crash de
+WiFi también, aunque el bug 2 de abajo alcanza para explicarlo por sí
+solo). **Corregido:** `CalibracionTouch::parametros` ahora es
+`uint16_t[8]`, guardado/restaurado como bloque opaco vía
+`Preferences::putBytes()`/`getBytes()` en `storage_prefs.cpp`, sin
+interpretar los valores individualmente.
+
+**Bug 2 — reintentar `WiFi.begin()` sin limpiar el intento anterior
+crashea el driver.** Al fallar la primera conexión (timeout de 15s) y
+tocar "Guardar y conectar" de nuevo, el driver WiFi del ESP-IDF todavía
+tenía el intento anterior en curso a nivel interno (nuestro propio
+timeout se rinde, pero el driver sigue reintentando en segundo plano) —
+llamar `WiFi.begin()` de nuevo en ese estado tira el error de log
+`wifi:sta is connecting, cannot set config` y termina en un reinicio.
+**Corregido** en `net::conectarWifi` (`net_client.cpp`): `WiFi.disconnect(true, true)`
++ una pausa corta antes de cada intento, para garantizar un estado limpio
+incluso en reintentos.
+
+**Pendiente de confirmar en hardware real:** recompilar con ambos fixes y
+verificar que las cruces de calibración aparecen de verdad en el primer
+arranque, que el touch responde con precisión después, y que reintentar
+una conexión WiFi fallida ya no crashea.
+
+**Segundo intento:** las cruces de calibración siguieron sin aparecer, y
+los reinicios con texto corrupto en Serial siguieron pasando, incluso
+durante el escaneo de redes (antes de cualquier intento de conexión).
+Dos causas distintas, no una sola:
+
+1. **NVS con datos viejos.** El bug 1 de arriba escribía basura en NVS con
+   `touch_ok=true` *antes* del fix — como NVS persiste entre flasheos, el
+   código ya corregido seguía leyendo esa calibración vieja como "válida"
+   y nunca volvía a pedir las 4 cruces. Hace falta **borrar la flash**
+   (Tools → Erase All Flash Before Sketch Upload, o `esptool.py
+   erase_flash`) para arrancar de cero con el fix ya aplicado — no alcanza
+   con solo resubir el sketch.
+2. **Gap real en la mitigación de brownout.** `WiFi.setTxPower(WIFI_POWER_2dBm)`
+   (§5.3) solo se aplicaba *después* de conectar con éxito, en
+   `esp32-kiosko.ino` — pero el escaneo de redes de `ui_config.cpp` y los
+   reintentos de conexión (que es justo donde más se vio inestabilidad)
+   corrían a full power, sin ninguna mitigación. **Corregido:** el
+   `setTxPower` se movió a `net::conectarWifi()` (cubre conexión y
+   reintentos) y se agregó también antes de `WiFi.scanNetworks()` en
+   `ui_config.cpp`.
+
+**Pendiente de confirmar en hardware real (otra vez):** borrar la flash
+antes de la próxima prueba para que la calibración corra de cero, y
+verificar si con el TX power ya aplicado también durante el escaneo la
+inestabilidad desaparece del todo.
+
+**✅ Confirmado en hardware real (2026-07-25), tercer intento:** con la
+flash borrada, las cruces de calibración corrieron bien, el touch quedó
+preciso, y el wizard completo (red → password → URL → "Guardar y
+conectar") funcionó de punta a punta sin reinicios ni corrupción de
+Serial. **T-07.3 queda cerrado.**
+
+Además, a pedido del equipo, se agregó una precarga de conveniencia: el
+campo de URL del backend (paso 3) ahora se completa automáticamente con
+`kBackendBaseUrl` de `secrets.h` cuando no hay nada guardado en NVS
+todavía (sigue siendo editable) — esto le devuelve un uso real a
+`secrets.h`, que había quedado sin ninguno tras el refactor de T-07.3.
+Como ahora `ui_config.cpp` lo incluye, `secrets.h` volvió a ser
+obligatorio para compilar (ver `README.md` del firmware, sección "Cómo
+correrlo").
+
+### 5.7 🟡 T-07.4 (Landing) — código escrito, pendiente de hardware
+
+Con T-07.3 cerrado, se implementó la pantalla Landing real:
+
+- **`ui_landing.cpp`**: al construir la pantalla, hace su propio fetch de
+  `/sectors` (`net::fetchSectores`, mismo patrón que `ui_config.cpp` con
+  `WiFi.scanNetworks()` — sincrónico/bloqueante). Muestra una pantalla de
+  "Cargando datos de sectores..." de inmediato (cargada y pintada a la
+  fuerza con `lv_timer_handler()` antes de bloquear en el fetch, y borrada
+  después con `lv_obj_del()`) — agregada tras probar en hardware real que,
+  sin esto, la pantalla anterior (Details, o la misma Landing si se volvió
+  desde ahí) quedaba "congelada" ~35-40s sin ningún indicio de que estaba
+  cargando. Es una excepción al resto del firmware (que no libera
+  pantallas viejas al navegar): esta sí, porque se crea en cada entrada a
+  la Landing (arranque + cada "Volver"), no una sola vez — dejarla sin
+  liberar acumularía memoria indefinidamente en una sesión larga de
+  kiosko. Calcula client-side el PM2.5 promedio de ciudad
+  (solo sectores con `pm25_promedio` no nulo) y el conteo por `estado`, los
+  muestra en un header, y lista los 22 sectores en un `lv_list` con el
+  fondo de cada fila teñido según su color de estado. Tocar una fila
+  navega a Details (`ui_details::construirPantalla(id)`, todavía
+  placeholder de T-07.5/T-07.6).
+- **Gesto pendiente de T-07.3 resuelto**: mantener presionado el header
+  ~2s vuelve al portal de configuración. Implementado con
+  `indevDrv.long_press_time = 2000` en `esp32-kiosko.ino` (es una config
+  global del indev en LVGL v8, no por widget — no hay otro uso de
+  long-press en el resto de las pantallas todavía, así que no genera
+  conflicto).
+- **Limpieza en `esp32-kiosko.ino`**: se sacó el fetch de "smoke test" que
+  vivía ahí desde T-07.2 (quedaba duplicado con el de `ui_landing.cpp`) y
+  la bandera `kSaltarWifiYFetch` (diagnóstico de la investigación del
+  panel ST7789, ya resuelta — dejarla habría sido código muerto, además de
+  quedar rota: `ui_landing.cpp` siempre hace su propio fetch ahora,
+  saltarlo desde el `.ino` ya no tenía el efecto que tuvo en su momento).
+
+**Simplificación aceptada, a mejorar más adelante si hace falta:** cada
+fila del `lv_list` guarda el `id` del sector en un `String*` propio
+(`new String(id)`, nunca liberado) porque el `JsonDocument` del fetch deja
+de ser válido apenas `construirPantalla()` retorna, mucho antes de que el
+usuario llegue a tocar una fila — mismo criterio informal que ya usa el
+resto del firmware (pantallas no se liberan explícitamente al navegar
+entre ellas).
+
+**✅ Confirmado en hardware real (2026-07-25):** compiló y desplegó bien —
+las 22 comunas y los agregados de ciudad se ven correctamente. **T-07.4
+queda cerrado.**
+
+### 5.8 🟡 T-07.5/T-07.6 (Details) — código escrito, pendiente de hardware
+
+Implementadas juntas (mismo `lv_tabview`, no tenía sentido separarlas):
+
+- **`net_client`**: dos fetches nuevos, `fetchDetalleSector()` (`GET
+  /sectors/{id}`) y `fetchRiesgoSector()` (`GET /risk/{sector}`) —
+  payloads chicos (~2-3KB y <1KB, `08-Arquitectura-ESP32.md` §9), así que
+  usan un `HTTPClient::getString()` + `deserializeJson()` simple
+  (`fetchJsonSimple`, factorizado), sin el streaming/filtro de
+  `fetchSectores()` (pensado para las 774KB de `/sectors`). De paso se
+  factorizó `normalizarBaseUrl()` (la lógica de sacar el `/` final), antes
+  duplicada solo dentro de `fetchSectores`.
+- **`ui_details.cpp`**: `lv_tabview` con pestañas "Resumen" (PM2.5 con
+  badge de color + CO2 + humedad + `lv_chart` de `historial_24h`, con
+  huecos explícitos vía `LV_CHART_POINT_NONE` en vez de inventar puntos) e
+  "Historia" (promedio anual, peor/mejor mes, días sobre el límite OMS,
+  banner si `historico_suficiente: false`). Sin pestaña Sensores, como
+  documenta `08-Arquitectura-ESP32.md` §3.
+- **Verificación de API evitó otro bug tipo "LovyanGFX"**: antes de asumir
+  cómo se comportan los tipos `JsonVariant`/`JsonObject` de ArduinoJson en
+  conversiones implícitas (rango-for sobre `JsonArray`, asignar
+  `doc["campo"]` a `JsonVariantConst`), se revisó el código fuente real de
+  la librería instalada (`D:\Documentos\Arduino\libraries\ArduinoJson\src`)
+  en vez de repetir el mismo error de adivinar una firma sin confirmar —
+  confirmado el operador de conversión genérico en
+  `VariantRefBase.hpp:51-54` (`operator T() const { return as<T>(); }`),
+  que cubre todos los casos usados.
+
+**"Última lectura hace X"** (`08-Arquitectura-ESP32.md` §4.2) todavía
+muestra el timestamp crudo del backend sin relativizar — es el fallback
+que ese mismo párrafo documenta para cuando no hay NTP (T-07.8, no
+implementado todavía), no un atajo nuestro.
+
+**✅ Confirmado en hardware real (2026-07-25):** compiló y anduvo bien.
+**T-07.5 y T-07.6 quedan cerrados.**
+
+**Hallazgo del usuario, corregido en la misma sesión:** la primera versión
+no tenía ninguna forma de volver de Details a la Landing (el gesto de
+mantener presionado ~2s solo existe en el header de la Landing, para ir
+al portal de configuración — no aplica desde Details). Se agregó un botón
+"Volver" en `ui_details.cpp`, como hermano del `lv_tabview` (no dentro,
+para que quede visible sin importar qué pestaña esté activa) usando el
+mismo patrón de `pantalla` con `lv_flex_flow` columna + `flex_grow` en el
+tabview que ya usa `ui_landing.cpp` — sin tocar el layout interno del
+`lv_tabview` para no arriesgar romper algo no probado.
+
+**Bug real encontrado al agregar la pantalla de carga de la Landing
+("no hace ninguna acción o se demora mucho"):** `lv_timer_handler()`
+llamado **recursivamente** — `ui_landing::construirPantalla()` lo llamaba
+para forzar el pintado de "Cargando..." antes del fetch, pero esa función
+se dispara desde un callback de touch (`alTocarSector`/`alVolver`/etc.)
+que ya corre **dentro** del `lv_timer_handler()` de `loop()`. LVGL no
+soporta llamarlo reentrante — causa cuelgues/demoras impredecibles, no un
+crash limpio. **Mismo bug existía ya en `ui_config.cpp`** (`alGuardar`,
+para pintar "Conectando..."/"Conectado. Reiniciando..." antes de bloquear
+en `conectarWifi()`/`ESP.restart()`) desde T-07.3 — no se había notado
+porque los síntomas (demora/comportamiento raro) se venían atribuyendo al
+brownout/panel de esa época, no a esto.
+
+**Corregido en ambos archivos:** verificado contra el código fuente real
+de LVGL instalado (`D:\Documentos\Arduino\libraries\lvgl\src\core\lv_refr.h`)
+que existe `lv_refr_now(lv_disp_t*)`, documentada explícitamente para este
+caso ("e.g. progress bar... this function can be called when the screen
+should be updated") — solo fuerza el redibujado, sin procesar indev/
+timers, segura de llamar desde un callback. Reemplaza los tres
+`lv_timer_handler()` sueltos (`ui_landing.cpp` y los dos de
+`ui_config.cpp::alGuardar`). El único `lv_timer_handler()` que queda en
+todo el firmware es el de `loop()` en `esp32-kiosko.ino`, que es correcto.
+
 ---
 
 ## 6. Orden sugerido de alto nivel
