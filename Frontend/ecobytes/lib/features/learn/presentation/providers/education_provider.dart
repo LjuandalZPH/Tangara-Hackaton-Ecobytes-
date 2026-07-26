@@ -35,6 +35,12 @@ class EducationProvider extends ChangeNotifier {
   bool _desdeFallback = false;
   bool _peticionEnCurso = false;
 
+  /// `cargar()` hace dos `await` seguidos (red y, si falla, el asset). Si el
+  /// usuario sale de /aprende mientras tanto, el provider puede haberse
+  /// destruido antes de que terminen, y `notifyListeners()` sobre un
+  /// ChangeNotifier ya destruido lanza en modo debug.
+  bool _destruido = false;
+
   EstadoEducacion get estado => _estado;
   ContenidoEducativo? get contenido => _contenido;
   String? get mensajeError => _mensajeError;
@@ -54,6 +60,7 @@ class EducationProvider extends ChangeNotifier {
     _peticionEnCurso = true;
     _estado = EstadoEducacion.cargando;
     _mensajeError = null;
+    if (_destruido) return;
     notifyListeners();
 
     try {
@@ -69,7 +76,14 @@ class EducationProvider extends ChangeNotifier {
       _peticionEnCurso = false;
     }
 
+    if (_destruido) return;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _destruido = true;
+    super.dispose();
   }
 
   /// Segundo intento, contra el asset local. Solo si este también falla se
