@@ -29,6 +29,14 @@ class ChatbotNoDisponibleException extends ApiException {
   const ChatbotNoDisponibleException(super.mensaje);
 }
 
+/// La fuente de datos de sensores (ClickHouse) no está disponible: `503`
+/// en cualquier endpoint de datos. A diferencia de un error de red, el
+/// servidor sí respondió; es una caída temporal del lado de los datos, así
+/// que la UI la presenta como "en pausa" y no como un fallo de conexión.
+class ServicioNoDisponibleException extends ApiException {
+  const ServicioNoDisponibleException(super.mensaje);
+}
+
 /// Cliente HTTP encargado de consumir el backend de EcoBytes.
 class ApiClient {
   ApiClient({http.Client? httpClient}) : _httpClient = httpClient ?? http.Client();
@@ -98,17 +106,14 @@ class ApiClient {
       );
     }
 
-    if (response.statusCode != 200) {
-      throw ApiException(
-        'El servidor respondió con un error (${response.statusCode}).',
+    if (response.statusCode == 503) {
+      throw ServicioNoDisponibleException(
+        _detalleDeError(response) ??
+            'La fuente de datos de sensores no está disponible en este momento.',
       );
     }
 
-    try {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    } catch (_) {
-      throw const ApiException('La respuesta del servidor no es válida.');
-    }
+    return _decodificar(response);
   }
 
   Future<Map<String, dynamic>> _postJson(
@@ -140,14 +145,22 @@ class ApiClient {
     }
 
     if (response.statusCode == 503) {
-      throw const ChatbotNoDisponibleException(
-        'El asistente no está configurado en el servidor.',
+      throw ChatbotNoDisponibleException(
+        _detalleDeError(response) ??
+            'El asistente no está configurado en el servidor.',
       );
     }
 
+    return _decodificar(response);
+  }
+
+  /// Devuelve el JSON de una respuesta `200`, o lanza [ApiException] con
+  /// el `detail` del backend si lo trae (ya viene redactado para el usuario).
+  Map<String, dynamic> _decodificar(http.Response response) {
     if (response.statusCode != 200) {
       throw ApiException(
-        'El servidor respondió con un error (${response.statusCode}).',
+        _detalleDeError(response) ??
+            'El servidor no pudo completar la solicitud. Intenta de nuevo.',
       );
     }
 
@@ -155,6 +168,19 @@ class ApiClient {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } catch (_) {
       throw const ApiException('La respuesta del servidor no es válida.');
+    }
+  }
+
+  /// Extrae `detail` de un error de FastAPI cuando es un texto. Los `422`
+  /// de validación traen una lista de dicts técnicos en `detail`: esos se
+  /// descartan y se usa el mensaje genérico.
+  String? _detalleDeError(http.Response response) {
+    try {
+      final json = jsonDecode(utf8.decode(response.bodyBytes));
+      final detalle = json is Map<String, dynamic> ? json['detail'] : null;
+      return detalle is String && detalle.trim().isNotEmpty ? detalle : null;
+    } catch (_) {
+      return null;
     }
   }
 }
