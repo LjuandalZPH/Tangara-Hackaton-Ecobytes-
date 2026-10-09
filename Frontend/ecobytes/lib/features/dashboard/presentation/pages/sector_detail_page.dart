@@ -7,6 +7,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/responsive.dart';
+import '../../../../shared/widgets/estado_error.dart';
 import '../../../../shared/widgets/landing_footer.dart';
 import '../../../../shared/widgets/landing_header.dart';
 import '../../../../shared/widgets/status_badge.dart';
@@ -131,9 +132,10 @@ class _SectorHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (provider.estado == EstadoDetalle.error) {
-      return _ErrorState(
+      return EstadoError(
         mensaje: provider.mensajeError ?? 'No fue posible cargar este sector.',
         onRetry: () => provider.cargarDetalle(provider.sectorActual!),
+        fuenteNoDisponible: provider.fuenteNoDisponible,
       );
     }
 
@@ -220,9 +222,10 @@ class _ResumenTab extends StatelessWidget {
           child: Center(child: CircularProgressIndicator()),
         );
       case EstadoDetalle.error:
-        return _ErrorState(
+        return EstadoError(
           mensaje: provider.mensajeError ?? 'No fue posible cargar los indicadores.',
           onRetry: () => provider.cargarDetalle(provider.sectorActual!),
+          fuenteNoDisponible: provider.fuenteNoDisponible,
         );
       case EstadoDetalle.listo:
         final detalle = provider.detalle!;
@@ -452,9 +455,10 @@ class _HistoriaTab extends StatelessWidget {
           child: Center(child: CircularProgressIndicator()),
         );
       case EstadoRiesgo.error:
-        return _ErrorState(
+        return EstadoError(
           mensaje: provider.mensajeError ?? 'No fue posible cargar el histórico.',
           onRetry: () => provider.cargarRiesgo(provider.sectorActual!),
+          fuenteNoDisponible: provider.fuenteNoDisponible,
         );
       case EstadoRiesgo.listo:
         return _RiskProfileCard(riesgo: provider.riesgo!);
@@ -620,9 +624,10 @@ class _SensoresTab extends StatelessWidget {
           child: Center(child: CircularProgressIndicator()),
         );
       case EstadoSensores.error:
-        return _ErrorState(
+        return EstadoError(
           mensaje: provider.mensajeErrorSensores ?? 'No fue posible cargar los sensores.',
           onRetry: () => provider.cargarSensores(provider.sectorActual!),
+          fuenteNoDisponible: provider.fuenteSensoresNoDisponible,
         );
       case EstadoSensores.listo:
         final sensores = provider.sensores;
@@ -726,33 +731,6 @@ class _ActionButtons extends StatelessWidget {
           label: const Text('Ver el mapa'),
         ),
       ],
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.mensaje, required this.onRetry});
-
-  final String mensaje;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return EcoCard(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.cloud_off, color: AppColors.textMuted, size: 32),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            mensaje,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          ElevatedButton(onPressed: onRetry, child: const Text('Reintentar')),
-        ],
-      ),
     );
   }
 }

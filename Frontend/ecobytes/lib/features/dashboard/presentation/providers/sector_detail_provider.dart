@@ -24,20 +24,26 @@ class SectorDetailProvider extends ChangeNotifier {
   EstadoDetalle _estado = EstadoDetalle.inicial;
   SectorDetalle? _detalle;
   String? _mensajeError;
+  bool _fuenteNoDisponible = false;
   String? _sectorActual;
 
   EstadoSensores _estadoSensores = EstadoSensores.inicial;
   List<SensorDeSector> _sensores = [];
   String? _mensajeErrorSensores;
+  bool _fuenteSensoresNoDisponible = false;
 
   EstadoDetalle get estado => _estado;
   SectorDetalle? get detalle => _detalle;
   String? get mensajeError => _mensajeError;
+  /// `true` si el último error fue un `503`: los datos están en pausa del
+  /// lado del servidor, no es un problema de conexión del usuario.
+  bool get fuenteNoDisponible => _fuenteNoDisponible;
   String? get sectorActual => _sectorActual;
 
   EstadoSensores get estadoSensores => _estadoSensores;
   List<SensorDeSector> get sensores => _sensores;
   String? get mensajeErrorSensores => _mensajeErrorSensores;
+  bool get fuenteSensoresNoDisponible => _fuenteSensoresNoDisponible;
 
   Future<void> cargarDetalle(String sectorId) async {
     _sectorActual = sectorId;
@@ -53,6 +59,7 @@ class SectorDetailProvider extends ChangeNotifier {
 
     _estado = EstadoDetalle.cargando;
     _mensajeError = null;
+    _fuenteNoDisponible = false;
     notifyListeners();
 
     try {
@@ -62,6 +69,7 @@ class SectorDetailProvider extends ChangeNotifier {
       _estado = EstadoDetalle.listo;
     } on ApiException catch (e) {
       _mensajeError = e.mensaje;
+      _fuenteNoDisponible = e is ServicioNoDisponibleException;
       _estado = EstadoDetalle.error;
     } catch (_) {
       _mensajeError = 'Ocurrió un error inesperado al cargar el sector.';
@@ -84,6 +92,7 @@ class SectorDetailProvider extends ChangeNotifier {
 
     _estadoSensores = EstadoSensores.cargando;
     _mensajeErrorSensores = null;
+    _fuenteSensoresNoDisponible = false;
     notifyListeners();
 
     try {
@@ -93,6 +102,7 @@ class SectorDetailProvider extends ChangeNotifier {
       _estadoSensores = EstadoSensores.listo;
     } on ApiException catch (e) {
       _mensajeErrorSensores = e.mensaje;
+      _fuenteSensoresNoDisponible = e is ServicioNoDisponibleException;
       _estadoSensores = EstadoSensores.error;
     } catch (_) {
       _mensajeErrorSensores = 'Ocurrió un error inesperado al cargar los sensores.';

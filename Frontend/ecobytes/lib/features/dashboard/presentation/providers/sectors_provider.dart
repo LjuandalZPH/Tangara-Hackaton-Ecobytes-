@@ -20,6 +20,7 @@ class SectorsProvider extends ChangeNotifier {
   EstadoCarga _estado = EstadoCarga.cargando;
   List<Sector> _sectores = [];
   String? _mensajeError;
+  bool _fuenteNoDisponible = false;
   DateTime? _ultimaActualizacion;
   String? _sectorSeleccionadoId;
   Timer? _timer;
@@ -35,6 +36,9 @@ class SectorsProvider extends ChangeNotifier {
   EstadoCarga get estado => _estado;
   List<Sector> get sectores => _sectores;
   String? get mensajeError => _mensajeError;
+  /// `true` si el último error fue un `503`: los datos están en pausa del
+  /// lado del servidor, no es un problema de conexión del usuario.
+  bool get fuenteNoDisponible => _fuenteNoDisponible;
   DateTime? get ultimaActualizacion => _ultimaActualizacion;
 
   Sector? get sectorSeleccionado {
@@ -57,6 +61,7 @@ class SectorsProvider extends ChangeNotifier {
 
     _estado = EstadoCarga.cargando;
     _mensajeError = null;
+    _fuenteNoDisponible = false;
     notifyListeners();
 
     await _fetch();
@@ -81,14 +86,17 @@ class SectorsProvider extends ChangeNotifier {
       _sectores = sectores;
       _estado = EstadoCarga.listo;
       _mensajeError = null;
+      _fuenteNoDisponible = false;
       _ultimaActualizacion = DateTime.now();
     } on ApiException catch (e) {
       _mensajeError = e.mensaje;
+      _fuenteNoDisponible = e is ServicioNoDisponibleException;
       if (_sectores.isEmpty) {
         _estado = EstadoCarga.error;
       }
     } catch (_) {
       _mensajeError = 'Ocurrió un error inesperado al cargar los sectores.';
+      _fuenteNoDisponible = false;
       if (_sectores.isEmpty) {
         _estado = EstadoCarga.error;
       }

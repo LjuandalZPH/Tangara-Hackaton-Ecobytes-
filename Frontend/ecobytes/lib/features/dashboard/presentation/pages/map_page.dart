@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/responsive.dart';
+import '../../../../shared/widgets/estado_error.dart';
 import '../../../../shared/widgets/status_badge.dart'; // Contiene EcoCard y SectionLabel
 import '../../../../shared/widgets/landing_footer.dart';
 import '../../../../shared/widgets/landing_header.dart';
@@ -97,6 +98,13 @@ class _MapAreaSection extends StatelessWidget {
 
     return Column(
       children: [
+        // Refresco fallido con datos previos: el mapa sigue visible, pero
+        // hay que decir que lo que se ve ya no es el dato en vivo.
+        if (sectorsProvider.estado == EstadoCarga.listo &&
+            sectorsProvider.mensajeError != null) ...[
+          _AvisoDatosDesactualizados(provider: sectorsProvider),
+          const SizedBox(height: AppSpacing.md),
+        ],
         // El contenedor del mapa
         AspectRatio(
           aspectRatio: context.isMobile ? 1.1 : 1.35,
@@ -129,35 +137,12 @@ class _MapAreaSection extends StatelessWidget {
       case EstadoCarga.cargando:
         return const Center(child: CircularProgressIndicator());
       case EstadoCarga.error:
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.cloud_off, color: AppColors.textMuted, size: 32),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  provider.mensajeError ??
-                      'No fue posible cargar los sectores.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                ElevatedButton(
-                  onPressed: provider.cargar,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGreen,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Reintentar'),
-                ),
-              ],
-            ),
-          ),
+        return EstadoError(
+          mensaje: provider.mensajeError ?? 'No fue posible cargar los sectores.',
+          onRetry: provider.cargar,
+          fuenteNoDisponible: provider.fuenteNoDisponible,
+          nota: 'También se reintenta automáticamente cada 45 segundos.',
+          conTarjeta: false,
         );
       case EstadoCarga.listo:
         return MapArea(
@@ -167,6 +152,65 @@ class _MapAreaSection extends StatelessWidget {
           showLegend: !context.isMobile,
         );
     }
+  }
+}
+
+/// Aviso sobre el mapa cuando el último refresco falló pero se siguen
+/// mostrando los sectores de la carga anterior.
+class _AvisoDatosDesactualizados extends StatelessWidget {
+  const _AvisoDatosDesactualizados({required this.provider});
+
+  final SectorsProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final ultima = provider.ultimaActualizacion;
+    final titulo = provider.fuenteNoDisponible
+        ? 'Datos de sensores en pausa'
+        : 'Sin conexión con el servidor';
+    final detalle = ultima != null
+        ? 'Mostrando el último dato disponible (${_formatearRelativo(ultima)}). '
+            'Se reintenta automáticamente.'
+        : 'Mostrando el último dato disponible. Se reintenta automáticamente.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.statusModerate.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.statusModerate.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            provider.fuenteNoDisponible ? Icons.sensors_off_outlined : Icons.cloud_off,
+            color: AppColors.statusModerate,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  detalle,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -405,7 +449,11 @@ class _SidePanelSection extends StatelessWidget {
 
   String _textoConexion(SectorsProvider provider) {
     if (provider.mensajeError != null) {
-      return 'Sin conexión, mostrando el último dato disponible · Cali, Colombia';
+      final estado = provider.fuenteNoDisponible ? 'Datos en pausa' : 'Sin conexión';
+      final ultima = provider.ultimaActualizacion;
+      return ultima != null
+          ? '$estado · último dato ${_formatearRelativo(ultima)} · Cali, Colombia'
+          : '$estado · Cali, Colombia';
     }
     return provider.ultimaActualizacion != null
         ? 'Actualizado ${_formatearRelativo(provider.ultimaActualizacion!)} · Cali, Colombia'
