@@ -8,10 +8,13 @@ de sensores viene de ClickHouse (tangara_plata), en modo solo lectura.
 Ver docs/backend.md en la raíz del repo.
 """
 
+import logging
 from pathlib import Path
 
-from fastapi import FastAPI
+from clickhouse_connect.driver.exceptions import ClickHouseError
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from config import settings
 from routers import chatbot, education, risk, sectors
@@ -19,6 +22,8 @@ from services import clickhouse_client, llm_client
 from services.geo import SectorIndex
 
 GEOJSON_PATH = Path(__file__).resolve().parent / "data" / "sectores.geojson"
+
+logger = logging.getLogger("ecobytes")
 
 # ─────────────────────────────────────────
 # Instancia principal de la app
@@ -57,6 +62,25 @@ app.include_router(sectors.router, prefix="/sectors", tags=["Sectores"])
 app.include_router(risk.router, prefix="/risk", tags=["Riesgo"])
 app.include_router(education.router, prefix="/education", tags=["Educación"])
 app.include_router(chatbot.router, prefix="/chatbot", tags=["Chatbot"])
+
+
+# ─────────────────────────────────────────
+# Errores de la fuente de datos
+# ─────────────────────────────────────────
+@app.exception_handler(ClickHouseError)
+async def clickhouse_no_disponible(request: Request, exc: ClickHouseError):
+    """
+    Traduce cualquier fallo de ClickHouse (credenciales, red, servidor sin
+    disco, etc.) a un 503 en vez de un 500 genérico. Además, a diferencia
+    del 500 sin manejar, esta respuesta pasa por CORSMiddleware, así que
+    Flutter web recibe el error real en lugar de un fallo de CORS.
+    El detalle técnico queda en el log; nunca viaja al cliente.
+    """
+    logger.error("ClickHouse no disponible en %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "La fuente de datos de sensores no está disponible en este momento."},
+    )
 
 
 # ─────────────────────────────────────────

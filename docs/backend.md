@@ -210,6 +210,7 @@ con `k = 0.24` (factor empírico, sujeto a validación contra un equipo de refer
 | `404` | El `id`/`sector` no corresponde a ninguna de las 22 comunas | `GET /sectors/comuna-99` |
 | `422` | Payload de `POST /chatbot` inválido (mensaje vacío, historial mal formado) | Validación automática de FastAPI/Pydantic |
 | `503` | `POST /chatbot` sin `OPENAI_API_KEY` configurada en el servidor | El resto de la API sigue funcionando con normalidad |
+| `503` | ClickHouse no responde o rechaza la consulta (credenciales, red, servidor sin disco…) en cualquier endpoint de datos | `{"detail": "La fuente de datos de sensores no está disponible en este momento."}`; el detalle técnico queda en el log. `GET /health` no consulta ClickHouse y sigue respondiendo `200` |
 | `502` | El proveedor del modelo falla, o el bucle de herramientas se agota sin responder | El detalle técnico del fallo queda en el log del servidor, nunca viaja al cliente |
 
 Un fallo de ClickHouse al construir el contexto del chatbot no rompe el endpoint: el snapshot se marca con `datos_sensores_disponibles: false` y el modelo lo reporta explícitamente en vez de inventar cifras.
