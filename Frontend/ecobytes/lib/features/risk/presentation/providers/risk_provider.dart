@@ -17,11 +17,15 @@ class RiskProvider extends ChangeNotifier {
   EstadoRiesgo _estado = EstadoRiesgo.inicial;
   Riesgo? _riesgo;
   String? _mensajeError;
+  bool _fuenteNoDisponible = false;
   String? _sectorActual;
 
   EstadoRiesgo get estado => _estado;
   Riesgo? get riesgo => _riesgo;
   String? get mensajeError => _mensajeError;
+  /// `true` si el último error fue un `503`: los datos están en pausa del
+  /// lado del servidor, no es un problema de conexión del usuario.
+  bool get fuenteNoDisponible => _fuenteNoDisponible;
   String? get sectorActual => _sectorActual;
 
   Future<void> cargarRiesgo(String sectorId) async {
@@ -38,6 +42,7 @@ class RiskProvider extends ChangeNotifier {
 
     _estado = EstadoRiesgo.cargando;
     _mensajeError = null;
+    _fuenteNoDisponible = false;
     notifyListeners();
 
     try {
@@ -47,6 +52,7 @@ class RiskProvider extends ChangeNotifier {
       _estado = EstadoRiesgo.listo;
     } on ApiException catch (e) {
       _mensajeError = e.mensaje;
+      _fuenteNoDisponible = e is ServicioNoDisponibleException;
       _estado = EstadoRiesgo.error;
     } catch (_) {
       _mensajeError = 'Ocurrió un error inesperado al cargar el riesgo.';
